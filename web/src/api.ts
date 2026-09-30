@@ -1,10 +1,25 @@
 import type { ActionName } from './catalog';
+import { t, tryT, type Language } from './i18n';
 
 export interface ApiError {
   kind: string;
+  /** Message id for translation; "raw" means `message` is tool output to show as-is. */
+  code?: string;
+  /** English fallback. */
   message: string;
+  params?: Record<string, string | number>;
   detail?: string;
   command?: string;
+  step?: string;
+}
+
+/** Translated, user-facing text for an API error. */
+export function errorMessage(err: ApiError): string {
+  const params = { ...(err.params ?? {}) };
+  if (typeof params.field === 'string') params.field = tryT(`field.${params.field}`) ?? params.field;
+  const text = err.code && err.code !== 'raw' ? tryT(`error.${err.code}`, params) ?? err.message : err.message;
+  const step = err.step ? tryT(`step.${err.step}`) : undefined;
+  return step ? `${step}: ${text}` : text;
 }
 
 export class RequestError extends Error {
@@ -47,10 +62,10 @@ async function request<T>(method: string, path: string, params: Record<string, a
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new RequestError({ kind: 'offline', message: 'O servidor do KubeDeck não está respondendo. Ele ainda está rodando no terminal?' });
+    throw new RequestError({ kind: 'offline', code: 'offline', message: t('error.offline') });
   }
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new RequestError(data ?? { kind: 'command', message: `Erro HTTP ${res.status}` });
+  if (!res.ok) throw new RequestError(data ?? { kind: 'command', code: 'http', params: { status: res.status }, message: `HTTP error ${res.status}` });
   return data as T;
 }
 
@@ -120,7 +135,8 @@ export interface AddAksBody {
 }
 
 export interface StepResult {
-  label: string;
+  step: string;
+  note?: string;
   command: string;
   ok: boolean;
   skipped?: boolean;
@@ -139,6 +155,7 @@ export interface Settings {
   protectedContexts: string[];
   refreshSeconds: number;
   theme: 'dark' | 'light';
+  language?: Language;
   lastContext?: string;
   lastNamespace: Record<string, string>;
   knownNamespaces: Record<string, string[]>;
@@ -167,5 +184,5 @@ export interface CommandEntry {
 
 export function errorOf(err: unknown): ApiError {
   if (err instanceof RequestError) return err.info;
-  return { kind: 'command', message: String((err as Error)?.message ?? err) };
+  return { kind: 'command', code: 'raw', message: String((err as Error)?.message ?? err) };
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, errorOf, type AksCluster, type ApiError, type AzureSubscription, type StepResult } from '../api';
+import { t, tryT } from '../i18n';
 import { ErrorBanner, Icon, Spinner } from './ui';
 
 interface Props {
@@ -60,7 +61,7 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
   const finalContext = body.contextName ?? body.cluster;
   const overwrites = !!finalContext && existingContexts.includes(finalContext);
 
-  // Preview comes from the server (dry run), so it is exactly what will run.
+  // The preview comes from the server (dry run), so it is exactly what will run.
   useEffect(() => {
     if (!complete) {
       setPreview([]);
@@ -99,34 +100,36 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
     }
   };
 
+  const optional = <em className="muted">({t('common.optional')})</em>;
+
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !running && onClose()}>
       <div className="modal modal-wide" role="dialog" aria-modal="true">
         <header className="modal-head">
-          <h3>Adicionar cluster AKS</h3>
+          <h3>{t('aks.title')}</h3>
           <button className="btn btn-ghost" onClick={onClose} disabled={running}><Icon name="close" /></button>
         </header>
 
         {result ? (
           <>
             <div className="modal-body">
-              <p>Contexto <strong>{result.context}</strong> adicionado ao kubeconfig.</p>
+              <p>{t('aks.added', { name: result.context })}</p>
               <StepList steps={result.steps} />
             </div>
             <footer className="modal-foot">
-              <button className="btn btn-ghost" onClick={onClose}>Fechar</button>
-              <button className="btn btn-primary" onClick={() => onDone(result.context, protect)}>Abrir cluster</button>
+              <button className="btn btn-ghost" onClick={onClose}>{t('common.close')}</button>
+              <button className="btn btn-primary" onClick={() => onDone(result.context, protect)}>{t('aks.open')}</button>
             </footer>
           </>
         ) : (
           <>
             <div className="modal-body">
-              <p>Usa o seu <code>az login</code> atual para baixar as credenciais e adicionar o cluster ao kubeconfig.</p>
+              <p>{t('aks.intro')}</p>
 
               {subsError && <ErrorBanner error={subsError} compact onRetry={loadSubs} />}
 
               <label className="field">
-                <span>Account (subscription) {subsLoading && <Spinner small />}</span>
+                <span>{t('aks.account')} {subsLoading && <Spinner small />}</span>
                 <div className="row">
                   <input
                     list="az-subs"
@@ -137,7 +140,7 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
                     autoFocus
                   />
                   <button className="btn" onClick={findClusters} disabled={!body.subscription || clustersLoading}>
-                    {clustersLoading ? <Spinner small /> : <Icon name="search" />} Buscar clusters
+                    {clustersLoading ? <Spinner small /> : <Icon name="search" />} {t('aks.findClusters')}
                   </button>
                 </div>
                 <datalist id="az-subs">
@@ -148,7 +151,7 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
               {clustersError && <ErrorBanner error={clustersError} compact onRetry={findClusters} />}
               {clusters && (
                 <div className="aks-list">
-                  {clusters.length === 0 && <div className="muted small pad">Nenhum cluster AKS visível nesta account.</div>}
+                  {clusters.length === 0 && <div className="muted small pad">{t('aks.noClusters')}</div>}
                   {clusters.map((c) => (
                     <button
                       key={`${c.resourceGroup}/${c.name}`}
@@ -158,7 +161,7 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
                       <strong>{c.name}</strong>
                       <span className="muted small">{c.resourceGroup} · {c.location} · v{c.kubernetesVersion}</span>
                       {c.powerState && c.powerState !== 'Running' && <span className="badge badge-warn">{c.powerState}</span>}
-                      {existingContexts.includes(c.name) && <span className="badge badge-muted">já no kubeconfig</span>}
+                      {existingContexts.includes(c.name) && <span className="badge badge-muted">{t('aks.inKubeconfig')}</span>}
                     </button>
                   ))}
                 </div>
@@ -166,53 +169,54 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
 
               <div className="grid-2">
                 <label className="field">
-                  <span>Resource group</span>
+                  <span>{t('aks.resourceGroup')}</span>
                   <input value={resourceGroup} onChange={(e) => setResourceGroup(e.target.value)} placeholder="rg-wp-test-13" spellCheck={false} />
                 </label>
                 <label className="field">
-                  <span>Nome do cluster</span>
+                  <span>{t('aks.clusterName')}</span>
                   <input value={cluster} onChange={(e) => setCluster(e.target.value)} placeholder="aks-wp-test-13" spellCheck={false} />
                 </label>
                 <label className="field">
-                  <span>Nome do contexto <em className="muted">(opcional)</em></span>
-                  <input value={contextName} onChange={(e) => setContextName(e.target.value)} placeholder={body.cluster || 'igual ao cluster'} spellCheck={false} />
+                  <span>{t('aks.contextName')} {optional}</span>
+                  <input
+                    value={contextName}
+                    onChange={(e) => setContextName(e.target.value)}
+                    placeholder={body.cluster || t('aks.contextPlaceholder')}
+                    spellCheck={false}
+                  />
                 </label>
                 <label className="field">
-                  <span>Namespace padrão <em className="muted">(opcional)</em></span>
+                  <span>{t('aks.defaultNamespace')} {optional}</span>
                   <input value={namespace} onChange={(e) => setNamespace(e.target.value)} placeholder="default" spellCheck={false} />
                 </label>
               </div>
 
               <label className="check">
                 <input type="checkbox" checked={kubelogin} onChange={(e) => setKubelogin(e.target.checked)} />
-                <span>Usar o login do <code>az</code> no kubectl (kubelogin azurecli) — evita pedir login pelo navegador</span>
+                <span>{t('aks.kubelogin')}</span>
               </label>
               <label className="check">
                 <input type="checkbox" checked={protect} onChange={(e) => setProtect(e.target.checked)} />
-                <span>Proteger este contexto (ações pedem que você digite o nome do recurso)</span>
+                <span>{t('aks.protect')}</span>
               </label>
 
-              {overwrites && (
-                <div className="callout callout-warn">
-                  Já existe um contexto <code>{finalContext}</code>; ele será substituído.
-                </div>
-              )}
+              {overwrites && <div className="callout callout-warn">{t('aks.overwrites', { name: finalContext })}</div>}
 
               {preview.length > 0 && (
                 <div className="field">
-                  <span>Comandos que serão executados</span>
+                  <span>{t('aks.commands')}</span>
                   <pre className="cmd">{preview.join('\n')}</pre>
-                  <span className="muted small">O <code>az aks get-credentials</code> também torna este cluster o contexto atual do seu terminal.</span>
+                  <span className="muted small">{t('aks.currentContextNote')}</span>
                 </div>
               )}
 
               {error && <ErrorBanner error={error} compact />}
             </div>
             <footer className="modal-foot">
-              {running && <span className="muted small">Isso pode levar alguns segundos…</span>}
-              <button className="btn btn-ghost" onClick={onClose} disabled={running}>Cancelar</button>
+              {running && <span className="muted small">{t('aks.slow')}</span>}
+              <button className="btn btn-ghost" onClick={onClose} disabled={running}>{t('common.cancel')}</button>
               <button className="btn btn-primary" disabled={!complete || running} onClick={submit}>
-                {running && <Spinner small />} Adicionar
+                {running && <Spinner small />} {t('aks.add')}
               </button>
             </footer>
           </>
@@ -225,16 +229,20 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
 function StepList({ steps }: { steps: StepResult[] }) {
   return (
     <div className="steps">
-      {steps.map((s) => (
-        <div key={s.command} className={`step${s.ok ? ' ok' : ' warn'}`}>
-          <Icon name={s.ok ? 'check' : 'alert'} />
-          <div>
-            <div>{s.label}</div>
-            <code className="small">{s.command}</code>
-            {s.output && <pre className="step-output">{s.output}</pre>}
+      {steps.map((s) => {
+        const note = s.note ? tryT(`note.${s.note}`) : undefined;
+        return (
+          <div key={s.command} className={`step${s.ok ? ' ok' : ' warn'}`}>
+            <Icon name={s.ok ? 'check' : 'alert'} />
+            <div>
+              <div>{tryT(`step.${s.step}`) ?? s.step}</div>
+              <code className="small">{s.command}</code>
+              {note && <div className="small warn-text">{note}</div>}
+              {s.output && <pre className="step-output">{s.output}</pre>}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

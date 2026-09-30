@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import type { ApiError } from '../api';
+import { errorMessage, type ApiError } from '../api';
 import type { Tone } from '../format';
 import { copyText } from '../hooks';
+import { t, tryT } from '../i18n';
 
 export function Badge({ tone = 'muted', children, title }: { tone?: Tone; children: ReactNode; title?: string }) {
   return (
@@ -13,7 +14,7 @@ export function Badge({ tone = 'muted', children, title }: { tone?: Tone; childr
 }
 
 export function Spinner({ small }: { small?: boolean }) {
-  return <span className={small ? 'spinner spinner-sm' : 'spinner'} aria-label="carregando" />;
+  return <span className={small ? 'spinner spinner-sm' : 'spinner'} aria-label={t('common.loading')} />;
 }
 
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
@@ -25,33 +26,26 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   );
 }
 
-const HINTS: Record<string, string> = {
-  auth: 'Depois de fazer login no terminal, clique em Tentar de novo.',
-  forbidden: 'Peça acesso ao time responsável pelo cluster, ou escolha outro namespace.',
-  unreachable: 'Confira VPN, se o cluster local está ligado (k3d/k3s) e o endereço no kubeconfig.',
-  'missing-binary': 'Instale a ferramenta e garanta que ela está no PATH do terminal onde o kubedeck foi iniciado.',
-  token: 'Feche esta aba e abra de novo o endereço que aparece no terminal do kubedeck.',
-};
-
 export function ErrorBanner({ error, onRetry, compact }: { error: ApiError; onRetry?: () => void; compact?: boolean }) {
   const [open, setOpen] = useState(false);
+  const hint = tryT(`hint.${error.kind}`);
   return (
     <div className={`error-banner error-${error.kind}${compact ? ' compact' : ''}`} role="alert">
       <div className="error-main">
         <Icon name={error.kind === 'auth' ? 'key' : 'alert'} />
         <div className="error-text">
-          <strong>{error.message}</strong>
-          {HINTS[error.kind] && <span className="error-hint">{HINTS[error.kind]}</span>}
+          <strong>{errorMessage(error)}</strong>
+          {hint && <span className="error-hint">{hint}</span>}
         </div>
         <div className="error-actions">
           {(error.detail || error.command) && (
             <button className="btn btn-ghost btn-sm" onClick={() => setOpen(!open)}>
-              {open ? 'Ocultar detalhes' : 'Detalhes'}
+              {open ? t('common.hideDetails') : t('common.details')}
             </button>
           )}
           {onRetry && (
             <button className="btn btn-sm" onClick={onRetry}>
-              <Icon name="refresh" /> Tentar de novo
+              <Icon name="refresh" /> {t('common.retry')}
             </button>
           )}
         </div>
@@ -66,7 +60,7 @@ export function ErrorBanner({ error, onRetry, compact }: { error: ApiError; onRe
   );
 }
 
-export function CopyButton({ text, label = 'Copiar', className = '' }: { text: string; label?: string; className?: string }) {
+export function CopyButton({ text, label = t('common.copy'), className = '' }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false);
   return (
     <button
@@ -81,7 +75,7 @@ export function CopyButton({ text, label = 'Copiar', className = '' }: { text: s
       title={label}
     >
       <Icon name={done ? 'check' : 'copy'} />
-      {label && <span>{done ? 'Copiado' : label}</span>}
+      {label && <span>{done ? t('common.copied') : label}</span>}
     </button>
   );
 }

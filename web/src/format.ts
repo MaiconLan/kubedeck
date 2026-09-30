@@ -1,3 +1,5 @@
+import { getLanguage, t } from './i18n';
+
 export type Tone = 'ok' | 'warn' | 'err' | 'info' | 'muted';
 
 export function age(ts?: string): string {
@@ -20,7 +22,7 @@ export function ts(value?: string): number {
 export function dateTime(value?: string): string {
   if (!value) return '';
   const d = new Date(value);
-  return isNaN(d.getTime()) ? value : d.toLocaleString('pt-BR');
+  return isNaN(d.getTime()) ? value : d.toLocaleString(getLanguage());
 }
 
 const ERROR_REASONS = /CrashLoopBackOff|Error|ErrImagePull|ImagePullBackOff|InvalidImageName|OOMKilled|CreateContainer(Config)?Error|Failed|Evicted|ContainerStatusUnknown|DeadlineExceeded|BackoffLimitExceeded/i;
@@ -81,14 +83,14 @@ export function condition(obj: any, type: string): any | undefined {
 
 /** Generic "Ready" condition, used by Flux objects and most operators. */
 export function readyState(obj: any): { text: string; tone: Tone; message: string } {
-  if (obj.spec?.suspend === true) return { text: 'Suspenso', tone: 'muted', message: '' };
+  if (obj.spec?.suspend === true) return { text: t('status.suspended'), tone: 'muted', message: '' };
   const c = condition(obj, 'Ready');
   if (!c) return { text: '—', tone: 'muted', message: '' };
   if (c.status === 'True') return { text: 'Ready', tone: 'ok', message: c.message ?? '' };
   if (c.status === 'False') {
     const stalled = condition(obj, 'Stalled')?.status === 'True';
     const reconciling = condition(obj, 'Reconciling')?.status === 'True';
-    if (reconciling && !stalled) return { text: 'Reconciliando', tone: 'warn', message: c.message ?? '' };
+    if (reconciling && !stalled) return { text: t('status.reconciling'), tone: 'warn', message: c.message ?? '' };
     return { text: c.reason || 'NotReady', tone: 'err', message: c.message ?? '' };
   }
   return { text: c.reason || 'Unknown', tone: 'warn', message: c.message ?? '' };

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ApiResource } from '../api';
 import { genericKind, KINDS, SECTIONS, type Kind } from '../catalog';
+import { t } from '../i18n';
 import { Icon } from './ui';
 
 interface Props {
@@ -46,7 +47,7 @@ export function Sidebar({ available, discovery, current, onSelect }: Props) {
           if (!kinds.length) return null;
           return (
             <div key={section} className="side-section">
-              <div className="side-title">{section}</div>
+              <div className="side-title">{t(`section.${section}`)}</div>
               {kinds.map((k) => (
                 <button key={k.type} className={`side-item${current === k.type ? ' active' : ''}`} onClick={() => onSelect(k)}>
                   <span>{k.label}</span>
@@ -59,8 +60,8 @@ export function Sidebar({ available, discovery, current, onSelect }: Props) {
 
         {discovery.length > 0 && (
           <div className="side-section">
-            <div className="side-title">Custom resources</div>
-            <input className="side-filter" placeholder="Filtrar CRDs" value={crdFilter} onChange={(e) => setCrdFilter(e.target.value)} />
+            <div className="side-title">{t('section.crds')}</div>
+            <input className="side-filter" placeholder={t('sidebar.filterCrds')} value={crdFilter} onChange={(e) => setCrdFilter(e.target.value)} />
             {crdGroups.map(([group, list]) => {
               const open = openGroups[group] ?? (!!crdFilter || list.some((r) => r.type === current));
               return (

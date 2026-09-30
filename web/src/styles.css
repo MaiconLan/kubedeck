@@ -530,3 +530,6 @@ table.mini td { padding: 7px 8px; border-bottom: 1px solid var(--border-soft); v
 }
 .empty .btn { margin-top: 12px; }
 @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.warn-text { color: var(--warn); }
+.lang { width: auto; }

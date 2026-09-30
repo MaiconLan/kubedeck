@@ -3,6 +3,7 @@ import { api } from '../api';
 import { HELM_TYPE, type ActionName, type Kind } from '../catalog';
 import { age } from '../format';
 import { useAsync } from '../hooks';
+import { getLanguage, t, type MessageKey } from '../i18n';
 import { CodeBlock } from './CodeBlock';
 import { LogViewer } from './LogViewer';
 import { Overview } from './Overview';
@@ -26,13 +27,13 @@ interface Props {
   onAction: (action: ActionName, target: Target, obj: any) => void;
 }
 
-const ACTION_META: Record<ActionName, { label: string; icon: string; danger?: boolean }> = {
-  restart: { label: 'Reiniciar', icon: 'restart' },
-  scale: { label: 'Escalar', icon: 'scale' },
-  delete: { label: 'Apagar', icon: 'trash', danger: true },
-  reconcile: { label: 'Reconciliar', icon: 'sync' },
-  suspend: { label: 'Suspender', icon: 'suspend' },
-  resume: { label: 'Retomar', icon: 'resume' },
+const ACTION_META: Record<ActionName, { label: MessageKey; icon: string; danger?: boolean }> = {
+  restart: { label: 'action.restart', icon: 'restart' },
+  scale: { label: 'action.scale', icon: 'scale' },
+  delete: { label: 'action.delete', icon: 'trash', danger: true },
+  reconcile: { label: 'action.reconcile', icon: 'sync' },
+  suspend: { label: 'action.suspend', icon: 'suspend' },
+  resume: { label: 'action.resume', icon: 'resume' },
 };
 
 export function DetailDrawer(props: Props) {
@@ -40,15 +41,15 @@ export function DetailDrawer(props: Props) {
   const isHelm = target.kind.type === HELM_TYPE;
 
   return (
-    <aside className="drawer" aria-label="Detalhes">
+    <aside className="drawer" aria-label={t('drawer.label')}>
       <header className="drawer-head">
         <div className="drawer-title">
           <span className="tag">{target.kind.kind}</span>
           <h2 title={target.name}>{target.name}</h2>
-          {target.ns && <span className="muted">em {target.ns}</span>}
+          {target.ns && <span className="muted">{t('drawer.in', { ns: target.ns })}</span>}
           <CopyButton text={target.name} label="" />
         </div>
-        <button className="btn btn-ghost" onClick={onClose} title="Fechar (Esc)"><Icon name="close" /></button>
+        <button className="btn btn-ghost" onClick={onClose} title={t('drawer.close')}><Icon name="close" /></button>
       </header>
       {isHelm ? <HelmDetail {...props} /> : <ResourceDetail {...props} />}
     </aside>
@@ -60,13 +61,13 @@ type Tab = 'overview' | 'logs' | 'secret' | 'describe' | 'yaml' | 'events';
 function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction }: Props) {
   const { kind, name, ns } = target;
   const obj = useAsync(() => api.object(ctx, kind.type, name, ns), [ctx, kind.type, name, ns], refreshMs);
-  const tabs: Array<[Tab, string]> = [
-    ['overview', 'Visão geral'],
-    ...(kind.logs ? [['logs', 'Logs'] as [Tab, string]] : []),
-    ...(kind.type === 'secrets' ? [['secret', 'Valores'] as [Tab, string]] : []),
-    ['describe', 'Describe'],
-    ['yaml', 'YAML'],
-    ['events', 'Eventos'],
+  const tabs: Array<[Tab, MessageKey]> = [
+    ['overview', 'tab.overview'],
+    ...(kind.logs ? [['logs', 'tab.logs'] as [Tab, MessageKey]] : []),
+    ...(kind.type === 'secrets' ? [['secret', 'tab.values'] as [Tab, MessageKey]] : []),
+    ['describe', 'tab.describe'],
+    ['yaml', 'tab.yaml'],
+    ['events', 'tab.events'],
   ];
   const [tab, setTab] = useState<Tab>('overview');
   useEffect(() => setTab('overview'), [ctx, kind.type, name, ns]);
@@ -80,7 +81,7 @@ function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction }: Props)
       <div className="drawer-bar">
         <nav className="tabs">
           {tabs.map(([id, label]) => (
-            <button key={id} className={`tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>{label}</button>
+            <button key={id} className={`tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>{t(label)}</button>
           ))}
         </nav>
         <div className="drawer-actions">
@@ -91,7 +92,7 @@ function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction }: Props)
               disabled={!data}
               onClick={() => onAction(a, target, data)}
             >
-              <Icon name={ACTION_META[a].icon} /> {ACTION_META[a].label}
+              <Icon name={ACTION_META[a].icon} /> {t(ACTION_META[a].label)}
             </button>
           ))}
         </div>
@@ -127,7 +128,7 @@ function TextTab({ load, deps, yaml }: { load: () => Promise<{ text: string }>; 
     <CodeBlock
       text={data.text}
       language={yaml ? 'yaml' : 'text'}
-      toolbar={<button className="btn btn-ghost btn-sm" onClick={reload} title="Recarregar">{loading ? <Spinner small /> : <Icon name="refresh" />}</button>}
+      toolbar={<button className="btn btn-ghost btn-sm" onClick={reload} title={t('common.reload')}>{loading ? <Spinner small /> : <Icon name="refresh" />}</button>}
     />
   );
 }
@@ -136,10 +137,10 @@ function EventsTab({ ctx, kind, name, ns }: { ctx: string; kind: string; name: s
   const { data, error, reload } = useAsync(() => api.events(ctx, kind, name, ns), [ctx, kind, name, ns], 5000);
   if (error) return <ErrorBanner error={error} onRetry={reload} />;
   if (!data) return <Spinner />;
-  if (data.length === 0) return <Empty title="Nenhum evento recente">O Kubernetes guarda eventos por cerca de 1 hora.</Empty>;
+  if (data.length === 0) return <Empty title={t('events.empty')}>{t('events.emptyBody')}</Empty>;
   return (
     <table className="mini events">
-      <thead><tr><th>Quando</th><th>Tipo</th><th>Motivo</th><th>Mensagem</th><th>Qtd</th></tr></thead>
+      <thead><tr><th>{t('col.when')}</th><th>{t('col.type')}</th><th>{t('col.reason')}</th><th>{t('col.message')}</th><th>{t('col.count')}</th></tr></thead>
       <tbody>
         {data.map((e: any) => (
           <tr key={e.metadata?.uid}>
@@ -160,20 +161,20 @@ type HelmTab = 'status' | 'values' | 'values-all' | 'history' | 'manifest' | 'no
 function HelmDetail({ ctx, target }: Props) {
   const [tab, setTab] = useState<HelmTab>('status');
   const ns = target.ns ?? target.row?.namespace ?? '';
-  const tabs: Array<[HelmTab, string]> = [
-    ['status', 'Status'],
-    ['values', 'Values'],
-    ['values-all', 'Values (todos)'],
-    ['history', 'Histórico'],
-    ['manifest', 'Manifest'],
-    ['notes', 'Notas'],
+  const tabs: Array<[HelmTab, MessageKey]> = [
+    ['status', 'tab.status'],
+    ['values', 'tab.helmValues'],
+    ['values-all', 'tab.helmValuesAll'],
+    ['history', 'tab.history'],
+    ['manifest', 'tab.manifest'],
+    ['notes', 'tab.notes'],
   ];
   return (
     <>
       <div className="drawer-bar">
         <nav className="tabs">
           {tabs.map(([id, label]) => (
-            <button key={id} className={`tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>{label}</button>
+            <button key={id} className={`tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>{t(label)}</button>
           ))}
         </nav>
       </div>
@@ -199,12 +200,12 @@ function HelmHistory({ ctx, ns, name }: { ctx: string; ns: string; name: string 
   try { rows = JSON.parse(data.text).reverse(); } catch { /* shown empty */ }
   return (
     <table className="mini">
-      <thead><tr><th>Rev.</th><th>Atualizado</th><th>Status</th><th>Chart</th><th>App</th><th>Descrição</th></tr></thead>
+      <thead><tr><th>{t('col.revision')}</th><th>{t('col.updated')}</th><th>{t('col.status')}</th><th>{t('col.chart')}</th><th>{t('col.app')}</th><th>{t('col.description')}</th></tr></thead>
       <tbody>
         {rows.map((r) => (
           <tr key={r.revision}>
             <td>{r.revision}</td>
-            <td className="nowrap">{new Date(r.updated).toLocaleString('pt-BR')}</td>
+            <td className="nowrap">{new Date(r.updated).toLocaleString(getLanguage())}</td>
             <td><Badge tone={r.status === 'deployed' ? 'ok' : r.status === 'failed' ? 'err' : 'muted'}>{r.status}</Badge></td>
             <td><code>{r.chart}</code></td>
             <td><code>{r.app_version}</code></td>

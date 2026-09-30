@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { t } from '../i18n';
 import { Icon } from './ui';
 
 export interface PaletteItem {
@@ -47,7 +48,7 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
           <input
             ref={input}
             value={query}
-            placeholder="Ir para… (po, deploy, hr, ks, ctx nome, ns nome)"
+            placeholder={t('palette.placeholder')}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') onClose();
@@ -58,7 +59,7 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
           />
         </div>
         <div className="pal-list" ref={list}>
-          {results.length === 0 && <div className="pal-empty">Nada encontrado.</div>}
+          {results.length === 0 && <div className="pal-empty">{t('palette.empty')}</div>}
           {results.map((item, i) => (
             <button
               key={item.id}
@@ -72,7 +73,7 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
             </button>
           ))}
         </div>
-        <div className="pal-foot">↑↓ navegar · Enter abrir · Esc fechar</div>
+        <div className="pal-foot">{t('palette.footer')}</div>
       </div>
     </div>
   );

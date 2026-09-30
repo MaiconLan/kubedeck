@@ -10,6 +10,7 @@ import { ResourceTable, rowKey } from './components/ResourceTable';
 import { Sidebar } from './components/Sidebar';
 import { Empty, ErrorBanner, Icon, Spinner } from './components/ui';
 import { isTyping, useAsync, useKey } from './hooks';
+import { detectLanguage, LANGUAGES, setLanguage, t, type Language } from './i18n';
 
 const ALL = '*';
 const DEFAULT_KIND = KIND_BY_TYPE.get('pods')!;
@@ -20,19 +21,20 @@ export function App() {
     const [settings, contexts] = await Promise.all([api.settings(), api.contexts()]);
     return { settings, contexts };
   }, []);
+  if (boot.data?.settings.language) setLanguage(boot.data.settings.language);
 
   if (boot.error) {
     return <div className="boot"><ErrorBanner error={boot.error} onRetry={boot.reload} /></div>;
   }
   if (!boot.data) {
-    return <div className="boot"><Spinner /> <span className="muted">Lendo kubeconfig…</span></div>;
+    return <div className="boot"><Spinner /> <span className="muted">{t('boot.readingKubeconfig')}</span></div>;
   }
   if (boot.data.contexts.contexts.length === 0) {
     return (
       <div className="boot">
-        <Empty title="Nenhum contexto no kubeconfig">
-          <p>Adicione um cluster AKS por aqui, ou configure o acesso com <code>kubectl config</code> e recarregue a página.</p>
-          <button className="btn btn-primary" onClick={() => setAdding(true)}><Icon name="plus" /> Adicionar cluster AKS</button>
+        <Empty title={t('boot.noContexts')}>
+          <p>{t('boot.noContextsBody')}</p>
+          <button className="btn btn-primary" onClick={() => setAdding(true)}><Icon name="plus" /> {t('boot.addAks')}</button>
         </Empty>
         {adding && (
           <AddClusterDialog
@@ -71,6 +73,9 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
   const [toast, setToast] = useState<string | null>(null);
   const filterRef = useRef<HTMLInputElement>(null);
 
+  const language: Language = settings.language ?? detectLanguage();
+  setLanguage(language);
+
   const isProtected = settings.protectedContexts.includes(ctx);
   const refreshMs = paused ? 0 : settings.refreshSeconds * 1000;
 
@@ -102,7 +107,7 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
 
   // If the chosen kind does not exist in this cluster (e.g. no Flux), fall back to pods.
   useEffect(() => {
-    if (available && kind.section !== 'CRDs' && !available.has(kind.type)) setKind(DEFAULT_KIND);
+    if (available && kind.section !== 'crds' && !available.has(kind.type)) setKind(DEFAULT_KIND);
   }, [available, kind]);
 
   // When namespaces cannot be listed, "all namespaces" will fail too: pick a concrete one.
@@ -124,7 +129,7 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
       save({ protectedContexts: [...settings.protectedContexts, name] });
     }
     switchContext(name, fresh);
-    showToast(`Cluster ${name} adicionado.`);
+    showToast(t('content.clusterAdded', { name }));
   };
 
   const switchContext = (name: string, list = contexts) => {
@@ -198,27 +203,27 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
       ...(discovery.data ?? []).filter((r) => !KIND_BY_TYPE.has(r.type) && r.verbs.includes('list') && r.group).map(genericKind),
     ].map((k) => ({
       id: `kind:${k.type}`,
-      group: k.section,
+      group: t(`section.${k.section}`),
       label: k.label,
       hint: k.short.join(', '),
       keywords: [...k.short, k.label.toLowerCase(), k.kind.toLowerCase(), k.type],
       run: () => selectKind(k),
     }));
     const ctxItems: PaletteItem[] = names.map((n) => ({
-      id: `ctx:${n}`, group: 'Contexto', label: n, keywords: ['ctx', 'context', n.toLowerCase()], run: () => switchContext(n),
+      id: `ctx:${n}`, group: t('palette.context'), label: n, keywords: ['ctx', 'context', n.toLowerCase()], run: () => switchContext(n),
     }));
     const nsList = namespaces.data?.forbidden ? settings.knownNamespaces[ctx] ?? [] : namespaces.data?.names ?? [];
     const nsItems: PaletteItem[] = [ALL, ...nsList].map((n) => ({
-      id: `ns:${n}`, group: 'Namespace', label: n === ALL ? 'todos os namespaces' : n,
+      id: `ns:${n}`, group: t('palette.namespace'), label: n === ALL ? t('palette.allNamespaces') : n,
       keywords: ['ns', 'namespace', n.toLowerCase()], run: () => switchNamespace(n),
     }));
     const addItem: PaletteItem = {
-      id: 'add-aks', group: 'Contexto', label: 'Adicionar cluster AKS…', keywords: ['add', 'aks', 'azure', 'adicionar', 'cluster'],
+      id: 'add-aks', group: t('palette.context'), label: t('palette.addAks'), keywords: ['add', 'aks', 'azure', 'cluster', t('palette.addAks').toLowerCase()],
       run: () => setAdding(true),
     };
     return [...kinds, ...ctxItems, addItem, ...nsItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [available, discovery.data, names.join(), namespaces.data, ctx, settings.knownNamespaces]);
+  }, [available, discovery.data, names.join(), namespaces.data, ctx, settings.knownNamespaces, language]);
 
   const items = list.data?.items ?? [];
   const showNamespaceCol = ns === ALL;
@@ -230,29 +235,29 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
       <main className="main">
         <header className={`topbar${isProtected ? ' protected' : ''}`}>
           <div className="picker">
-            <label>Contexto</label>
+            <label>{t('topbar.context')}</label>
             <select value={ctx} onChange={(e) => switchContext(e.target.value)} title={ctxInfo?.server}>
               {names.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             <button
               className={`btn btn-ghost btn-sm lock${isProtected ? ' on' : ''}`}
               onClick={toggleProtected}
-              title={isProtected ? 'Contexto protegido: ações pedem digitar o nome. Clique para desproteger.' : 'Proteger este contexto (recomendado para produção/trabalho)'}
+              title={isProtected ? t('topbar.protectedOn') : t('topbar.protectedOff')}
             >
               <Icon name={isProtected ? 'lock' : 'unlock'} />
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setAdding(true)} title="Adicionar cluster AKS ao kubeconfig">
+            <button className="btn btn-ghost btn-sm" onClick={() => setAdding(true)} title={t('topbar.addCluster')}>
               <Icon name="plus" />
             </button>
           </div>
 
           <div className="picker">
-            <label>Namespace</label>
+            <label>{t('topbar.namespace')}</label>
             {namespaces.data?.forbidden ? (
               <NamespaceInput value={ns} options={settings.knownNamespaces[ctx] ?? []} onCommit={switchNamespace} />
             ) : (
               <select value={ns} onChange={(e) => switchNamespace(e.target.value)} disabled={!namespaces.data && !namespaces.error}>
-                <option value={ALL}>todos</option>
+                <option value={ALL}>{t('topbar.allNamespaces')}</option>
                 {(namespaces.data?.names ?? (ns !== ALL ? [ns] : [])).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             )}
@@ -260,33 +265,41 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
 
           <div className="search-box grow">
             <Icon name="search" size={14} />
-            <input ref={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Filtrar ${kind.label.toLowerCase()}  ( / )`} />
+            <input ref={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('topbar.filter', { kind: kind.label.toLowerCase() })} />
             {filter && <button className="btn btn-ghost btn-xs" onClick={() => setFilter('')}><Icon name="close" size={12} /></button>}
           </div>
 
-          <button className="btn btn-ghost" onClick={() => setPalette(true)} title="Ir para (: ou Ctrl+K)">
+          <button className="btn btn-ghost" onClick={() => setPalette(true)} title={t('topbar.goTo')}>
             <kbd>:</kbd>
           </button>
           <div className="refresh">
-            <button className="btn btn-ghost btn-sm" onClick={() => setPaused(!paused)} title={paused ? 'Retomar atualização automática' : 'Pausar atualização automática'}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setPaused(!paused)} title={paused ? t('topbar.resume') : t('topbar.pause')}>
               <Icon name={paused ? 'play' : 'pause'} />
             </button>
             <select
               value={settings.refreshSeconds}
               onChange={(e) => save({ refreshSeconds: Number(e.target.value) })}
               className="select-sm"
-              title="Intervalo de atualização"
+              title={t('topbar.interval')}
             >
               {[2, 5, 10, 30, 60].map((s) => <option key={s} value={s}>{s}s</option>)}
             </select>
-            <button className="btn btn-ghost btn-sm" onClick={list.reload} title="Atualizar agora">
+            <button className="btn btn-ghost btn-sm" onClick={list.reload} title={t('topbar.refreshNow')}>
               {list.loading ? <Spinner small /> : <Icon name="refresh" />}
             </button>
           </div>
-          <button className={`btn btn-ghost${showLog ? ' active' : ''}`} onClick={() => setShowLog(!showLog)} title="Comandos executados">
+          <button className={`btn btn-ghost${showLog ? ' active' : ''}`} onClick={() => setShowLog(!showLog)} title={t('topbar.commands')}>
             <Icon name="terminal" />
           </button>
-          <button className="btn btn-ghost" onClick={() => save({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} title="Tema">
+          <select
+            className="select-sm lang"
+            value={language}
+            onChange={(e) => save({ language: e.target.value as Language })}
+            title={t('topbar.language')}
+          >
+            {LANGUAGES.map((l) => <option key={l.id} value={l.id} title={l.label}>{l.short}</option>)}
+          </select>
+          <button className="btn btn-ghost" onClick={() => save({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} title={t('topbar.theme')}>
             <Icon name={settings.theme === 'dark' ? 'sun' : 'moon'} />
           </button>
         </header>
@@ -295,10 +308,10 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
           <div className="content-head">
             <h1>{kind.label}</h1>
             <span className="count">{list.data ? items.length : ''}</span>
-            <span className="muted small">{kind.section === 'CRDs' ? kind.type : ''}</span>
+            <span className="muted small">{kind.section === 'crds' ? kind.type : ''}</span>
             <span className="spacer" />
             <span className="muted small ctx-summary">
-              {ctx}{list.data?.namespaced === false ? ' · recurso do cluster' : ns === ALL ? ' · todos os namespaces' : ` · ${ns}`}
+              {ctx} · {list.data?.namespaced === false ? t('content.clusterScoped') : ns === ALL ? t('content.allNamespaces') : ns}
             </span>
           </div>
 
@@ -307,8 +320,8 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
 
           {!list.data && !list.error && <div className="loading-rows">{Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton" />)}</div>}
           {list.data && items.length === 0 && (
-            <Empty title={`Nenhum ${kind.label.toLowerCase()} aqui`}>
-              {ns !== ALL && list.data.namespaced ? <>Namespace <code>{ns}</code>. Tente “todos” no seletor de namespace.</> : null}
+            <Empty title={t('content.emptyTitle', { kind: kind.label.toLowerCase() })}>
+              {ns !== ALL && list.data.namespaced ? t('content.emptyNamespace', { ns }) : null}
             </Empty>
           )}
           {list.data && items.length > 0 && (
@@ -381,7 +394,7 @@ function NamespaceInput({ value, options, onCommit }: { value: string; options: 
         onBlur={commit}
         onKeyDown={(e) => e.key === 'Enter' && commit()}
         placeholder="namespace"
-        title="Seu usuário não pode listar namespaces neste cluster; digite o nome."
+        title={t('topbar.nsInputTitle')}
         spellCheck={false}
       />
       <datalist id="known-ns">{options.map((o) => <option key={o} value={o} />)}</datalist>

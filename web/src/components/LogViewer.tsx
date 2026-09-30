@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type ApiError } from '../api';
+import { t } from '../i18n';
 import { ErrorBanner, Icon, Spinner } from './ui';
 
 const MAX_LINES = 10_000;
@@ -84,31 +85,31 @@ export function LogViewer({ ctx, ns, type, name, containers }: Props) {
       <div className="code-toolbar logs-toolbar">
         {(containers.length > 1 || !isPod) && (
           <select value={container} onChange={(e) => setContainer(e.target.value)} className="select-sm">
-            {!isPod && <option value="">Todos os containers</option>}
+            {!isPod && <option value="">{t('logs.allContainers')}</option>}
             {containers.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
-        <select value={tail} onChange={(e) => setTail(Number(e.target.value))} className="select-sm" title="Linhas iniciais">
-          {[100, 500, 2000, 10000].map((n) => <option key={n} value={n}>últimas {n}</option>)}
-          <option value={-1}>tudo</option>
+        <select value={tail} onChange={(e) => setTail(Number(e.target.value))} className="select-sm" title={t('logs.initialLines')}>
+          {[100, 500, 2000, 10000].map((n) => <option key={n} value={n}>{t('logs.lastN', { n })}</option>)}
+          <option value={-1}>{t('logs.everything')}</option>
         </select>
-        <Toggle on={follow} set={setFollow} label="Seguir" />
-        <Toggle on={timestamps} set={setTimestamps} label="Horário" />
-        {isPod && <Toggle on={previous} set={setPrevious} label="Anterior" title="Logs do container antes do último restart" />}
-        <Toggle on={wrap} set={setWrap} label="Quebrar" />
+        <Toggle on={follow} set={setFollow} label={t('logs.follow')} />
+        <Toggle on={timestamps} set={setTimestamps} label={t('logs.timestamps')} />
+        {isPod && <Toggle on={previous} set={setPrevious} label={t('logs.previous')} title={t('logs.previousTitle')} />}
+        <Toggle on={wrap} set={setWrap} label={t('logs.wrap')} />
         <div className="search-box">
           <Icon name="search" size={14} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar nos logs" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('logs.search')} />
         </div>
-        {q && <Toggle on={onlyMatches} set={setOnlyMatches} label="Só resultados" />}
+        {q && <Toggle on={onlyMatches} set={setOnlyMatches} label={t('logs.onlyMatches')} />}
         <span className="spacer" />
         <span className={`stream-state state-${status}`}>
           {status === 'connecting' ? <Spinner small /> : <span className="dot" />}
-          {status === 'connecting' ? 'conectando' : status === 'streaming' ? (follow ? 'ao vivo' : 'carregado') : 'encerrado'}
-          <span className="muted"> · {lines.current.length} linhas</span>
+          {status === 'connecting' ? t('logs.connecting') : status === 'streaming' ? (follow ? t('logs.live') : t('logs.loaded')) : t('logs.ended')}
+          <span className="muted"> · {t('logs.lines', { n: lines.current.length })}</span>
         </span>
-        <button className="btn btn-ghost btn-sm" title="Reconectar" onClick={() => setSession((s) => s + 1)}><Icon name="refresh" /></button>
-        <button className="btn btn-ghost btn-sm" title="Baixar .log" onClick={download}><Icon name="download" /></button>
+        <button className="btn btn-ghost btn-sm" title={t('logs.reconnect')} onClick={() => setSession((s) => s + 1)}><Icon name="refresh" /></button>
+        <button className="btn btn-ghost btn-sm" title={t('logs.download')} onClick={download}><Icon name="download" /></button>
       </div>
       {error && <ErrorBanner error={error} compact onRetry={() => setSession((s) => s + 1)} />}
       {warning && !error && <div className="log-warning">{warning}</div>}
@@ -120,7 +121,7 @@ export function LogViewer({ ctx, ns, type, name, containers }: Props) {
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
         }}
       >
-        {visible.length === 0 && status !== 'connecting' && !error && <div className="log-empty">Nenhuma linha de log.</div>}
+        {visible.length === 0 && status !== 'connecting' && !error && <div className="log-empty">{t('logs.empty')}</div>}
         {visible.map((line, i) => (
           <div key={i} className={`log-line ${lineTone(line)}`}>{highlight(line, q)}</div>
         ))}
@@ -130,7 +131,7 @@ export function LogViewer({ ctx, ns, type, name, containers }: Props) {
           stick.current = true;
           if (body.current) body.current.scrollTop = body.current.scrollHeight;
         }}>
-          <Icon name="arrowDown" /> Ir para o fim
+          <Icon name="arrowDown" /> {t('logs.jumpBottom')}
         </button>
       )}
     </div>

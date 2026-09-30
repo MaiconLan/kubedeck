@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Cell, Column, Kind } from '../catalog';
+import { t } from '../i18n';
 import { Badge } from './ui';
 
 interface Props {
@@ -60,7 +61,7 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
           <tr>
             {columns.map((c) => (
               <th key={c.key} className={`${c.align === 'right' ? 'right' : ''}${c.grow ? ' grow' : ''}`} onClick={() => toggleSort(c)}>
-                {c.label}
+                {t(c.label)}
                 {sort.key === c.key && <span className="sort">{sort.dir === 1 ? '▲' : '▼'}</span>}
               </th>
             ))}
@@ -77,7 +78,7 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
           })}
         </tbody>
       </table>
-      {rows.length === 0 && items.length > 0 && <div className="table-empty">Nenhum item corresponde ao filtro.</div>}
+      {rows.length === 0 && items.length > 0 && <div className="table-empty">{t('table.noMatch')}</div>}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { t } from '../i18n';
 import { CopyButton, Icon } from './ui';
 
 /** Read-only code viewer with light YAML highlighting and in-text search. */
@@ -14,12 +15,12 @@ export function CodeBlock({ text, language = 'text', toolbar }: { text: string; 
       <div className="code-toolbar">
         <div className="search-box">
           <Icon name="search" size={14} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no texto" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('common.searchText')} />
           {q && <span className="search-count">{matches}</span>}
         </div>
         {toolbar}
         <span className="spacer" />
-        <button className={`btn btn-ghost btn-sm${wrap ? ' active' : ''}`} onClick={() => setWrap(!wrap)} title="Quebrar linhas">
+        <button className={`btn btn-ghost btn-sm${wrap ? ' active' : ''}`} onClick={() => setWrap(!wrap)} title={t('common.wrapLines')}>
           <Icon name="wrap" />
         </button>
         <CopyButton text={text} />

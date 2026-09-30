@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api';
 import { useAsync } from '../hooks';
+import { t } from '../i18n';
 import { CopyButton, Empty, ErrorBanner, Icon, Spinner } from './ui';
 
 export function SecretView({ ctx, ns, name }: { ctx: string; ns: string; name: string }) {
@@ -10,7 +11,7 @@ export function SecretView({ ctx, ns, name }: { ctx: string; ns: string; name: s
 
   if (error) return <ErrorBanner error={error} onRetry={reload} />;
   if (loading && !data) return <div className="pad"><Spinner /></div>;
-  if (!data || data.values.length === 0) return <Empty title="Secret sem chaves" />;
+  if (!data || data.values.length === 0) return <Empty title={t('secret.empty')} />;
 
   const exportEnv = data.values
     .filter((v) => !v.binary && !v.value.includes('\n'))
@@ -20,12 +21,12 @@ export function SecretView({ ctx, ns, name }: { ctx: string; ns: string; name: s
   return (
     <div className="secret">
       <div className="secret-head">
-        <span className="muted">Tipo: <code>{data.type}</code> · {data.values.length} chaves · valores decodificados de base64</span>
+        <span className="muted">{t('secret.summary', { type: data.type, n: data.values.length })}</span>
         <span className="spacer" />
         <button className="btn btn-ghost btn-sm" onClick={() => { setAll(!all); setShown({}); }}>
-          <Icon name={all ? 'eyeOff' : 'eye'} /> {all ? 'Ocultar todos' : 'Revelar todos'}
+          <Icon name={all ? 'eyeOff' : 'eye'} /> {all ? t('secret.hideAll') : t('secret.showAll')}
         </button>
-        {exportEnv && <CopyButton text={exportEnv} label="Copiar como .env" />}
+        {exportEnv && <CopyButton text={exportEnv} label={t('secret.copyEnv')} />}
       </div>
       {data.values.map((v) => {
         const visible = all || shown[v.key];
@@ -34,7 +35,7 @@ export function SecretView({ ctx, ns, name }: { ctx: string; ns: string; name: s
           <div key={v.key} className="secret-row">
             <div className="secret-key">
               <code>{v.key}</code>
-              <span className="muted small">{v.bytes} bytes{v.binary ? ' · binário (base64)' : ''}{kindHint(v.value)}</span>
+              <span className="muted small">{[t('secret.bytes', { n: v.bytes }), v.binary && t('secret.binary'), kindHint(v.value)].filter(Boolean).join(' · ')}</span>
               <span className="spacer" />
               <button className="btn btn-ghost btn-sm" onClick={() => setShown({ ...shown, [v.key]: !shown[v.key] })}>
                 <Icon name={visible ? 'eyeOff' : 'eye'} />
@@ -64,9 +65,9 @@ function prettify(value: string): string {
 }
 
 function kindHint(value: string): string {
-  if (value.includes('-----BEGIN CERTIFICATE-----')) return ' · certificado';
-  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(value)) return ' · chave privada';
-  if (/^\s*[{[]/.test(value)) return ' · JSON';
-  if (/^eyJ[\w-]+\.[\w-]+\./.test(value)) return ' · JWT';
+  if (value.includes('-----BEGIN CERTIFICATE-----')) return t('secret.cert');
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(value)) return t('secret.privateKey');
+  if (/^\s*[{[]/.test(value)) return t('secret.json');
+  if (/^eyJ[\w-]+\.[\w-]+\./.test(value)) return t('secret.jwt');
   return '';
 }

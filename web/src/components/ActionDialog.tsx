@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, errorOf, type ApiError } from '../api';
 import type { ActionName } from '../catalog';
+import { t, type MessageKey } from '../i18n';
 import type { Target } from './DetailDrawer';
 import { ErrorBanner, Icon, Spinner } from './ui';
 
@@ -14,17 +15,15 @@ interface Props {
   onDone: (message: string) => void;
 }
 
-const COPY: Record<ActionName, { title: string; verb: string; explain: string; danger?: boolean }> = {
-  restart: { title: 'Reiniciar', verb: 'Reiniciar', explain: 'Cria novos pods aos poucos (rollout) e remove os antigos. Sem downtime se houver mais de uma réplica.' },
-  scale: { title: 'Escalar', verb: 'Aplicar', explain: 'Muda o número de réplicas. Se houver HPA ou Flux gerenciando este recurso, o valor pode ser revertido.' },
-  delete: { title: 'Apagar pod', verb: 'Apagar', explain: 'O pod é removido. Se ele pertence a um Deployment/StatefulSet, um novo será criado no lugar.', danger: true },
-  reconcile: { title: 'Reconciliar', verb: 'Reconciliar', explain: 'Pede ao Flux para sincronizar agora, sem esperar o próximo intervalo.' },
-  suspend: { title: 'Suspender', verb: 'Suspender', explain: 'O Flux para de aplicar mudanças neste recurso até ele ser retomado.', danger: true },
-  resume: { title: 'Retomar', verb: 'Retomar', explain: 'O Flux volta a reconciliar este recurso normalmente.' },
-};
+const DANGER: Partial<Record<ActionName, boolean>> = { delete: true, suspend: true };
+
+function copyFor(action: ActionName) {
+  const key = (part: string) => `actionDialog.${action}.${part}` as MessageKey;
+  return { title: t(key('title')), verb: t(key('verb')), explain: t(key('explain')), danger: !!DANGER[action] };
+}
 
 export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, onDone }: Props) {
-  const copy = COPY[action];
+  const copy = copyFor(action);
   const [replicas, setReplicas] = useState<number>(obj?.spec?.replicas ?? 1);
   const [typed, setTyped] = useState('');
   const [command, setCommand] = useState('');
@@ -56,7 +55,7 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
     setError(undefined);
     try {
       const r = await api.action({ ...body, confirmName: isProtected ? typed : undefined });
-      onDone(r.output || `${copy.title}: ${target.name}`);
+      onDone(r.output || t('actionDialog.done', { action: copy.title, name: target.name }));
     } catch (e) {
       setError(errorOf(e));
       setBusy(false);
@@ -72,15 +71,15 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
         </header>
         <div className="modal-body">
           <div className="ctx-line">
-            Contexto <strong>{ctx}</strong>
-            {target.ns && <> · namespace <strong>{target.ns}</strong></>}
-            {isProtected && <span className="protected-tag"><Icon name="lock" size={12} /> protegido</span>}
+            {t('actionDialog.context')} <strong>{ctx}</strong>
+            {target.ns && <> · {t('actionDialog.namespace')} <strong>{target.ns}</strong></>}
+            {isProtected && <span className="protected-tag"><Icon name="lock" size={12} /> {t('actionDialog.protected')}</span>}
           </div>
           <p>{copy.explain}</p>
 
           {action === 'scale' && (
             <label className="field">
-              <span>Réplicas (atual: {obj?.spec?.replicas ?? '?'})</span>
+              <span>{t('actionDialog.replicas', { n: obj?.spec?.replicas ?? '?' })}</span>
               <div className="stepper">
                 <button className="btn btn-sm" onClick={() => setReplicas(Math.max(0, replicas - 1))}>−</button>
                 <input
@@ -95,13 +94,13 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
           )}
 
           <div className="field">
-            <span>Comando que será executado</span>
+            <span>{t('actionDialog.command')}</span>
             <pre className="cmd">{command || '…'}</pre>
           </div>
 
           {isProtected && (
             <label className="field">
-              <span>Este contexto está protegido. Digite <code>{target.name}</code> para confirmar.</span>
+              <span>{t('actionDialog.typeToConfirm', { name: target.name })}</span>
               <input
                 ref={input}
                 value={typed}
@@ -116,7 +115,7 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
           {error && <ErrorBanner error={error} compact />}
         </div>
         <footer className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
           <button ref={isProtected || action === 'scale' ? undefined : (el) => el?.focus()}
             className={`btn ${copy.danger ? 'btn-danger' : 'btn-primary'}`} disabled={!canRun} onClick={submit}>
             {busy && <Spinner small />} {copy.verb}
