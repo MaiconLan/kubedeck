@@ -1,0 +1,38 @@
+{
+  "name": "kubedeck",
+  "version": "0.1.0",
+  "description": "Local, visual Kubernetes dashboard that drives kubectl and helm.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "kubedeck": "bin/kubedeck.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p server/tsconfig.json",
+    "build:web": "vite build",
+    "start": "node bin/kubedeck.js",
+    "dev:server": "tsx watch server/cli.ts --dev",
+    "dev:web": "vite",
+    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}
