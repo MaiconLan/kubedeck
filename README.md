@@ -15,6 +15,38 @@ npm run build
 npm link          # makes the "kubedeck" command available in any terminal
 ```
 
+### Troubleshooting: "kubedeck is not recognized as the name of a cmdlet…" (Windows)
+
+`npm link` creates `kubedeck`, `kubedeck.cmd` and `kubedeck.ps1` in npm's global folder. If that folder is
+not in your `PATH`, PowerShell can't find them. Check:
+
+```powershell
+Get-ChildItem (npm prefix -g) -Filter "kubedeck*"                    # the 3 files should be listed
+$env:PATH -split ';' | Select-String -SimpleMatch (npm prefix -g)   # prints nothing = folder not in PATH
+```
+
+Add the folder to your user `PATH` (no admin rights needed):
+
+```powershell
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';' + (npm prefix -g), 'User')
+```
+
+Then **close every terminal and open a new one** (including VS Code terminals). Open terminals keep the old `PATH`.
+
+If a managed/company laptop resets your `PATH` at login, add it in your PowerShell profile instead
+(create the profile first with `New-Item -ItemType File -Force $PROFILE` if it doesn't exist):
+
+```powershell
+Add-Content $PROFILE "`n`$env:PATH += ';' + (npm prefix -g)"
+```
+
+Other cases:
+
+- **The 3 files are missing:** `npm link` failed, often with `EPERM`/`EACCES` when npm's folder is under
+  `C:\Program Files`. Run `npm config set prefix "$env:APPDATA\npm"` and `npm link` again.
+- **"running scripts is disabled on this system":** execution policy blocks the `.ps1` wrapper. Use `kubedeck.cmd` instead.
+- **No global command at all:** `npm start` from the project folder, or `node <path-to-kubedeck>\bin\kubedeck.js`.
+
 ## Usage
 
 ```bash
