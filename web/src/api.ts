@@ -76,8 +76,13 @@ export const api = {
   commands: () => request<CommandEntry[]>('GET', '/api/commands'),
   namespaces: (ctx: string) => request<{ forbidden: boolean; names: string[] }>('GET', '/api/namespaces', { ctx }),
   discovery: (ctx: string, fresh = false) => request<ApiResource[]>('GET', '/api/discovery', { ctx, fresh }),
-  list: (ctx: string, type: string, ns: string) =>
-    request<{ namespaced: boolean; items: any[] }>('GET', '/api/list', { ctx, type, ns }),
+  list: (ctx: string, type: string, ns: string, filter: { labels?: string; fields?: string } = {}) =>
+    request<{ namespaced: boolean; items: any[] }>('GET', '/api/list', { ctx, type, ns, ...filter }),
+  dashboard: (ctx: string, ns: string) => request<DashboardData>('GET', '/api/dashboard', { ctx, ns }),
+  forwards: () => request<PortForward[]>('GET', '/api/forwards'),
+  startForward: (body: { ctx: string; ns: string; type: string; name: string; remotePort: number; localPort?: number }) =>
+    request<PortForward>('POST', '/api/forwards', {}, body),
+  stopForward: (id: string) => request<{ ok: boolean }>('DELETE', '/api/forwards', { id }),
   object: (ctx: string, type: string, name: string, ns?: string) => request<any>('GET', '/api/object', { ctx, type, name, ns }),
   yaml: (ctx: string, type: string, name: string, ns?: string) =>
     request<{ text: string }>('GET', '/api/object', { ctx, type, name, ns, format: 'yaml' }),
@@ -105,6 +110,50 @@ export interface ActionBody {
   replicas?: number;
   confirmName?: string;
   dryRun?: boolean;
+}
+
+export type Part<T> = { ok: true; data: T } | { ok: false; error: ApiError };
+
+export interface Usage {
+  cpu: number;
+  memory: number;
+}
+
+export interface DashboardNode {
+  name: string;
+  labels: Record<string, string>;
+  unschedulable: boolean;
+  conditions: any[];
+  kubeletVersion: string;
+  capacity: Usage & { pods: number };
+  allocatable: Usage & { pods: number };
+}
+
+export interface DashboardData {
+  version: Part<string>;
+  nodes: Part<DashboardNode[]>;
+  nodeMetrics: Part<Array<Usage & { name: string }>>;
+  /** Slim pods: metadata/spec/status subsets plus summed container requests. */
+  pods: Part<any[]>;
+  podMetrics: Part<Array<Usage & { name: string; namespace: string }>>;
+  workloads: Part<any[]>;
+  flux: Part<any[]> | null;
+  warnings: Part<any[]>;
+  allNamespaces: boolean;
+}
+
+export interface PortForward {
+  id: string;
+  ctx: string;
+  ns: string;
+  type: string;
+  name: string;
+  remotePort: number;
+  localPort: number;
+  status: 'starting' | 'active' | 'error' | 'stopped';
+  error?: ApiError;
+  startedAt: string;
+  command: string;
 }
 
 export interface AzureSubscription {

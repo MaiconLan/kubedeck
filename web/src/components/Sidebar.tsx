@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ApiResource } from '../api';
-import { genericKind, KINDS, SECTIONS, type Kind } from '../catalog';
+import { genericKind, KINDS, kindLabel, SECTIONS, type Kind } from '../catalog';
 import { t } from '../i18n';
 import { Icon } from './ui';
 
@@ -50,7 +50,7 @@ export function Sidebar({ available, discovery, current, onSelect }: Props) {
               <div className="side-title">{t(`section.${section}`)}</div>
               {kinds.map((k) => (
                 <button key={k.type} className={`side-item${current === k.type ? ' active' : ''}`} onClick={() => onSelect(k)}>
-                  <span>{k.label}</span>
+                  <span>{kindLabel(k)}</span>
                   <span className="side-short">{k.short[0]}</span>
                 </button>
               ))}

@@ -65,9 +65,22 @@ Nothing is stored except preferences in `~/.kubedeck/settings.json`.
 | `:` or `Ctrl+K` | Go to a resource, context or namespace (`po`, `deploy`, `hr`, `ks`, `ctx name`, `ns name`) |
 | `/` | Filter the table (several words, labels such as `app=api`) |
 | `Esc` | Close the panel |
+| `g` then `d` / `m` / `p` / `y` / `s` … | Go to dashboard / map / pods / deployments / services … |
+| `g` then `f` / `l` | Port-forwards / executed commands panel |
+| `?` | All shortcuts |
 
 ### Features
 
+- **Dashboard** (home screen): node and pod health, cluster CPU/memory usage against allocatable capacity and
+  requests, per-node usage, top pods by CPU and memory, a "needs attention" list and recent warnings.
+  Usage numbers need `metrics-server` (bundled with k3s and AKS); without it the dashboard shows requests only.
+- **Relationship map**: Ingress/IngressRoute → Service → Deployment/StatefulSet/DaemonSet/Job → Pods →
+  ConfigMaps/Secrets/PVCs, one band per app. Hover a card to highlight its chain, click to open it.
+- **Port-forward** from pods, services, deployments and statefulsets, with a panel to open, copy or stop
+  active forwards. Forwards stop when KubeDeck exits.
+- **Navigation**: browser back/forward and bookmarkable URLs, related resources in the detail panel
+  (a deployment's pods, a pod's node, ConfigMaps/Secrets/PVCs it uses…), recent items in quick navigation,
+  and `g` + key shortcuts (press `?` for the list).
 - kubeconfig contexts (without touching your `current-context`) and namespaces.
 - Workloads, network (including Traefik IngressRoutes), config, storage, Flux, Helm releases and any CRD.
 - Detail panel: overview, live logs (a pod or a whole deployment), describe, YAML, events, decoded secrets.

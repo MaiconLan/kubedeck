@@ -109,10 +109,26 @@ function parseApiResources(text: string): ApiResource[] {
 
 // ---- reading objects ----------------------------------------------------------
 
-export async function listObjects(ctx: string, type: string, ns: string | undefined) {
+const SELECTOR_RE = /^[\w.\/=!,:() -]{1,500}$/;
+
+function checkSelector(value: string, field: string): string {
+  if (!SELECTOR_RE.test(value) || value.startsWith('-')) throw invalid('invalidField', `Invalid value for ${field}.`, { field });
+  return value;
+}
+
+export interface ListFilter {
+  /** Label selector, e.g. "app=api,tier!=db". */
+  labels?: string;
+  /** Field selector, e.g. "spec.nodeName=node-1". */
+  fields?: string;
+}
+
+export async function listObjects(ctx: string, type: string, ns: string | undefined, filter: ListFilter = {}) {
   checkType(type);
   const namespaced = await isNamespaced(ctx, type);
   const args = ['get', type, ...(namespaced ? nsArgs(ns) : [])];
+  if (filter.labels) args.push('-l', checkSelector(filter.labels, 'selector'));
+  if (filter.fields) args.push('--field-selector', checkSelector(filter.fields, 'selector'));
   const data = await kubectlJson(ctx, args, { timeoutMs: 30_000 });
   const items: any[] = data.items ?? [];
   for (const item of items) sanitize(item);

@@ -109,6 +109,12 @@ const PATHS: Record<string, string> = {
   cube: 'M12 2 3 7v10l9 5 9-5V7zM3 7l9 5 9-5M12 12v10',
   arrowDown: 'M12 5v14m-6-6 6 6 6-6',
   plus: 'M12 5v14M5 12h14',
+  plug: 'M9 2v6m6-6v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4',
+  home: 'M3 11 12 3l9 8v10h-6v-6H9v6H3z',
+  map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14m6-12v14',
+  keyboard: 'M2 6h20v12H2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10',
+  back: 'M15 18l-6-6 6-6',
+  forward: 'M9 18l6-6-6-6',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
 };
 

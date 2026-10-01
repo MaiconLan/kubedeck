@@ -6,10 +6,12 @@ import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { runAction, ALLOWED, type ActionRequest } from './actions.js';
 import { addAksCluster, listAksClusters, listSubscriptions, type AddAksRequest } from './azure.js';
+import { dashboard } from './dashboard.js';
 import { AppError, invalid } from './errors.js';
 import { listReleases, releaseDetail, type HelmView } from './helm.js';
 import { commandHistory } from './kube.js';
 import { streamLogs } from './logs.js';
+import { listForwards, startForward, stopForward, type ForwardRequest } from './portforward.js';
 import {
   checkContext, decodeSecret, describe, discover, eventsFor, getJson, getYaml,
   listContexts, listNamespaces, listObjects,
@@ -45,7 +47,20 @@ export function createApp(token: string) {
 
     'GET /api/namespaces': async (q) => listNamespaces(await ctxOf(q)),
     'GET /api/discovery': async (q) => discover(await ctxOf(q), q.get('fresh') === '1'),
-    'GET /api/list': async (q) => listObjects(await ctxOf(q), q.get('type') ?? '', q.get('ns') ?? undefined),
+    'GET /api/list': async (q) =>
+      listObjects(await ctxOf(q), q.get('type') ?? '', q.get('ns') ?? undefined, {
+        labels: q.get('labels') || undefined,
+        fields: q.get('fields') || undefined,
+      }),
+    'GET /api/dashboard': async (q) => dashboard(await ctxOf(q), q.get('ns') ?? undefined),
+
+    'GET /api/forwards': async () => listForwards(),
+    'POST /api/forwards': async (_q, req) => {
+      const body = (await readJson(req)) as ForwardRequest;
+      body.ctx = await checkContext(body.ctx);
+      return startForward(body);
+    },
+    'DELETE /api/forwards': async (q) => stopForward(q.get('id')),
     'GET /api/object': async (q) => {
       const ctx = await ctxOf(q);
       const [type, name, ns] = [q.get('type') ?? '', q.get('name') ?? '', q.get('ns') || undefined];

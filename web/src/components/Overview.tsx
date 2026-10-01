@@ -2,14 +2,16 @@ import { useState, type ReactNode } from 'react';
 import { kindByName } from '../catalog';
 import { age, dateTime, podStatus, readyState, type Tone } from '../format';
 import { t } from '../i18n';
+import { Related } from './Related';
 import { Badge } from './ui';
 
 interface Props {
+  ctx: string;
   obj: any;
   onNavigate: (kindName: string, name: string, ns?: string) => void;
 }
 
-export function Overview({ obj, onNavigate }: Props) {
+export function Overview({ ctx, obj, onNavigate }: Props) {
   const md = obj.metadata ?? {};
   const ready = readyState(obj);
   const conditions: any[] = obj.status?.conditions ?? [];
@@ -65,6 +67,8 @@ export function Overview({ obj, onNavigate }: Props) {
           </table>
         </section>
       )}
+
+      <Related ctx={ctx} obj={obj} onNavigate={onNavigate} />
 
       <KeyValues title={t('ov.labels')} values={md.labels} />
       <KeyValues title={t('ov.annotations')} values={md.annotations} collapsed />

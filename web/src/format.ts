@@ -111,6 +111,28 @@ export function shortImage(image: string): string {
   return noRegistry.length > 60 ? `${noRegistry.slice(0, 57)}…` : noRegistry;
 }
 
+export function cores(value: number): string {
+  if (!value) return '0';
+  if (value < 1) return `${Math.round(value * 1000)}m`;
+  return `${value.toFixed(value < 10 ? 2 : 1).replace(/\.?0+$/, '')}`;
+}
+
+export function bytes(value: number): string {
+  if (!value) return '0';
+  const units = ['B', 'Ki', 'Mi', 'Gi', 'Ti'];
+  let v = value;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)}${units[i]}`;
+}
+
+export function percent(part: number, whole: number): number {
+  return whole > 0 ? Math.round((part / whole) * 100) : 0;
+}
+
 export function selectorString(labels: Record<string, string> | undefined): string {
   return Object.entries(labels ?? {}).map(([k, v]) => `${k}=${v}`).join(',');
 }

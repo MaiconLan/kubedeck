@@ -1,7 +1,7 @@
 import {
   age, condition, images, podStatus, ratio, readyCount, readyState, restarts, shortImage, ts, type Tone,
 } from './format';
-import { t, type MessageKey } from './i18n';
+import { t, tryT, type MessageKey } from './i18n';
 
 export type Cell = string | number | { text: string; tone?: Tone; title?: string };
 
@@ -28,9 +28,14 @@ export interface Kind {
   columns: Column[];
   actions?: ActionName[];
   logs?: boolean;
+  /** Supports kubectl port-forward. */
+  forward?: boolean;
 }
 
 export const HELM_TYPE = 'helm-releases';
+/** Pseudo kinds for screens that are not resource lists. */
+export const DASHBOARD_TYPE = 'dashboard';
+export const MAP_TYPE = 'map';
 
 const name: Column = { key: 'name', label: 'col.name', get: (o) => o.metadata?.name ?? '', sort: (o) => o.metadata?.name ?? '', grow: true };
 const namespace: Column = { key: 'ns', label: 'col.namespace', get: (o) => o.metadata?.namespace ?? '', sort: (o) => o.metadata?.namespace ?? '' };
@@ -68,6 +73,10 @@ const workloadActions: ActionName[] = ['restart', 'scale'];
 const fluxActions: ActionName[] = ['reconcile', 'suspend', 'resume'];
 
 export const KINDS: Kind[] = [
+  // ---- Overview screens
+  { type: DASHBOARD_TYPE, label: 'Dashboard', kind: 'Dashboard', short: ['dash', 'home'], section: 'overview', columns: [] },
+  { type: MAP_TYPE, label: 'Map', kind: 'Map', short: ['map', 'graph', 'topology'], section: 'overview', columns: [] },
+
   // ---- Cluster
   {
     type: 'nodes', label: 'Nodes', kind: 'Node', short: ['no', 'node'], section: 'cluster',
@@ -120,7 +129,7 @@ export const KINDS: Kind[] = [
 
   // ---- Workloads
   {
-    type: 'pods', label: 'Pods', kind: 'Pod', short: ['po', 'pod'], section: 'workloads', logs: true, actions: ['delete'],
+    type: 'pods', label: 'Pods', kind: 'Pod', short: ['po', 'pod'], section: 'workloads', logs: true, actions: ['delete'], forward: true,
     columns: [
       name,
       namespace,
@@ -142,7 +151,7 @@ export const KINDS: Kind[] = [
   },
   {
     type: 'deployments.apps', label: 'Deployments', kind: 'Deployment', short: ['deploy', 'deployment', 'dp'], section: 'workloads',
-    logs: true, actions: workloadActions,
+    logs: true, actions: workloadActions, forward: true,
     columns: [
       name,
       namespace,
@@ -155,7 +164,7 @@ export const KINDS: Kind[] = [
   },
   {
     type: 'statefulsets.apps', label: 'StatefulSets', kind: 'StatefulSet', short: ['sts'], section: 'workloads',
-    logs: true, actions: workloadActions,
+    logs: true, actions: workloadActions, forward: true,
     columns: [name, namespace, { key: 'ready', label: 'col.ready', get: (o) => ratio(o.status?.readyReplicas, o.spec?.replicas) }, imageCol, ageCol],
   },
   {
@@ -215,7 +224,7 @@ export const KINDS: Kind[] = [
 
   // ---- Network
   {
-    type: 'services', label: 'Services', kind: 'Service', short: ['svc', 'service'], section: 'network',
+    type: 'services', label: 'Services', kind: 'Service', short: ['svc', 'service'], section: 'network', forward: true,
     columns: [
       name, namespace,
       { key: 'type', label: 'col.type', get: (o) => o.spec?.type ?? '' },
@@ -390,15 +399,24 @@ function helmDate(value: string): string {
   return m ? `${m[1]}T${m[2]}${m[4]}:${m[5]}` : value;
 }
 
-export type SectionId = 'cluster' | 'workloads' | 'network' | 'config' | 'storage' | 'flux' | 'helm' | 'crds';
+export type SectionId = 'overview' | 'cluster' | 'workloads' | 'network' | 'config' | 'storage' | 'flux' | 'helm' | 'crds';
 
-export const SECTIONS: SectionId[] = ['cluster', 'workloads', 'network', 'config', 'storage', 'flux', 'helm'];
+export const SECTIONS: SectionId[] = ['overview', 'cluster', 'workloads', 'network', 'config', 'storage', 'flux', 'helm'];
 
 export const KIND_BY_TYPE = new Map(KINDS.map((k) => [k.type, k]));
 
 /** Map a Kind name (from ownerReferences, events) to our catalog entry. */
 export function kindByName(kind: string): Kind | undefined {
-  return KINDS.find((k) => k.kind === kind && k.type !== HELM_TYPE);
+  return KINDS.find((k) => k.kind === kind && k.section !== 'overview' && k.type !== HELM_TYPE);
+}
+
+/** Display name; overview screens are translated, Kubernetes kinds are not. */
+export function kindLabel(kind: Kind): string {
+  return tryT(`kind.${kind.type}`) ?? kind.label;
+}
+
+export function isScreen(kind: Kind): boolean {
+  return kind.section === 'overview';
 }
 
 export function genericKind(res: { type: string; kind: string; name: string; shortNames: string[]; namespaced: boolean }): Kind {

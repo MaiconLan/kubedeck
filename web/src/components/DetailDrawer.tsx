@@ -25,6 +25,7 @@ interface Props {
   onClose: () => void;
   onNavigate: (kindName: string, name: string, ns?: string) => void;
   onAction: (action: ActionName, target: Target, obj: any) => void;
+  onForward: (target: Target, obj: any) => void;
 }
 
 const ACTION_META: Record<ActionName, { label: MessageKey; icon: string; danger?: boolean }> = {
@@ -58,7 +59,7 @@ export function DetailDrawer(props: Props) {
 
 type Tab = 'overview' | 'logs' | 'secret' | 'describe' | 'yaml' | 'events';
 
-function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction }: Props) {
+function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction, onForward }: Props) {
   const { kind, name, ns } = target;
   const obj = useAsync(() => api.object(ctx, kind.type, name, ns), [ctx, kind.type, name, ns], refreshMs);
   const tabs: Array<[Tab, MessageKey]> = [
@@ -85,6 +86,11 @@ function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction }: Props)
           ))}
         </nav>
         <div className="drawer-actions">
+          {kind.forward && (
+            <button className="btn btn-sm" disabled={!data} onClick={() => onForward(target, data)}>
+              <Icon name="plug" /> {t('pf.button')}
+            </button>
+          )}
           {actions.map((a) => (
             <button
               key={a}
@@ -101,7 +107,7 @@ function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction }: Props)
         {tab === 'overview' && (
           obj.error ? <ErrorBanner error={obj.error} onRetry={obj.reload} />
             : !data ? <Spinner />
-              : <Overview obj={data} onNavigate={onNavigate} />
+              : <Overview ctx={ctx} obj={data} onNavigate={onNavigate} />
         )}
         {tab === 'logs' && data && (
           <LogViewer ctx={ctx} ns={ns ?? ''} type={kind.type} name={name} containers={containersOf(data)} />
