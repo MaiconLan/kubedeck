@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { ApiResource } from '../api';
 import { genericKind, KINDS, kindLabel, SECTIONS, type Kind } from '../catalog';
 import { t } from '../i18n';
-import { Icon } from './ui';
+import { BrandMark, Icon } from './ui';
 
 interface Props {
   available: Set<string> | null;
   discovery: ApiResource[];
   current: string;
   onSelect: (kind: Kind) => void;
+  /** Global controls pinned to the bottom. */
+  footer?: ReactNode;
 }
 
 const BUILTIN_GROUPS = new Set([
@@ -19,7 +21,7 @@ const BUILTIN_GROUPS = new Set([
   'storagemigration.k8s.io', 'internal.apiserver.k8s.io',
 ]);
 
-export function Sidebar({ available, discovery, current, onSelect }: Props) {
+export function Sidebar({ available, discovery, current, onSelect, footer }: Props) {
   const [crdFilter, setCrdFilter] = useState('');
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
@@ -38,7 +40,7 @@ export function Sidebar({ available, discovery, current, onSelect }: Props) {
   return (
     <nav className="sidebar">
       <div className="brand">
-        <span className="brand-mark"><Icon name="cube" size={18} /></span>
+        <BrandMark />
         <span>KubeDeck</span>
       </div>
       <div className="side-scroll">
@@ -82,6 +84,7 @@ export function Sidebar({ available, discovery, current, onSelect }: Props) {
           </div>
         )}
       </div>
+      {footer && <div className="side-footer">{footer}</div>}
     </nav>
   );
 }

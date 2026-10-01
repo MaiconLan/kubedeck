@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../i18n';
-import { Icon } from './ui';
 
 export interface PaletteItem {
   id: string;
@@ -44,7 +43,7 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
     <div className="modal-backdrop palette-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="palette" role="dialog" aria-modal="true">
         <div className="pal-input">
-          <Icon name="search" />
+          <span className="pal-key">:</span>
           <input
             ref={input}
             value={query}
@@ -57,6 +56,7 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
               else if (e.key === 'Enter') choose(results[index]);
             }}
           />
+          <span className="pal-shortcuts">po · deploy · hr · ks · ctx · ns</span>
         </div>
         <div className="pal-list" ref={list}>
           {results.length === 0 && <div className="pal-empty">{t('palette.empty')}</div>}
@@ -73,7 +73,11 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
             </button>
           ))}
         </div>
-        <div className="pal-foot">{t('palette.footer')}</div>
+        <div className="pal-foot">
+          <span><kbd>↑↓</kbd>{t('palette.navigate')}</span>
+          <span><kbd>enter</kbd>{t('palette.open')}</span>
+          <span><kbd>esc</kbd>{t('palette.close')}</span>
+        </div>
       </div>
     </div>
   );

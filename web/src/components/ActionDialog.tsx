@@ -81,21 +81,24 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
             <label className="field">
               <span>{t('actionDialog.replicas', { n: obj?.spec?.replicas ?? '?' })}</span>
               <div className="stepper">
-                <button className="btn btn-sm" onClick={() => setReplicas(Math.max(0, replicas - 1))}>−</button>
-                <input
-                  ref={isProtected ? undefined : input}
-                  type="number" min={0} max={1000} value={replicas}
-                  onChange={(e) => setReplicas(Math.max(0, Math.min(1000, Math.floor(Number(e.target.value) || 0))))}
-                  onKeyDown={(e) => e.key === 'Enter' && submit()}
-                />
-                <button className="btn btn-sm" onClick={() => setReplicas(Math.min(1000, replicas + 1))}>+</button>
+                <div className="stepper-group">
+                  <button onClick={() => setReplicas(Math.max(0, replicas - 1))}>−</button>
+                  <input
+                    ref={isProtected ? undefined : input}
+                    type="number" min={0} max={1000} value={replicas}
+                    onChange={(e) => setReplicas(Math.max(0, Math.min(1000, Math.floor(Number(e.target.value) || 0))))}
+                    onKeyDown={(e) => e.key === 'Enter' && submit()}
+                  />
+                  <button onClick={() => setReplicas(Math.min(1000, replicas + 1))}>+</button>
+                </div>
+                <ReplicaDelta from={obj?.spec?.replicas} to={replicas} />
               </div>
             </label>
           )}
 
           <div className="field">
-            <span>{t('actionDialog.command')}</span>
-            <pre className="cmd">{command || '…'}</pre>
+            <span className="mono-label">{t('actionDialog.command')}</span>
+            <pre className="cmd"><span className="prompt">$ </span>{command || '…'}</pre>
           </div>
 
           {isProtected && (
@@ -103,6 +106,7 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
               <span>{t('actionDialog.typeToConfirm', { name: target.name })}</span>
               <input
                 ref={input}
+                className="confirm-input"
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && submit()}
@@ -124,4 +128,11 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
       </div>
     </div>
   );
+}
+
+/** "+2" / "−1" next to the stepper, compared with the current replica count. */
+function ReplicaDelta({ from, to }: { from?: number; to: number }) {
+  if (typeof from !== 'number' || from === to) return null;
+  const diff = to - from;
+  return <span className={`stepper-delta ${diff > 0 ? 'tone-ok' : 'tone-warn'}`}>{diff > 0 ? `+${diff}` : `−${-diff}`}</span>;
 }

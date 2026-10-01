@@ -51,7 +51,12 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], intervalMs = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
+  // Resuming polling (e.g. a tab becoming visible) refreshes right away.
+  const prevInterval = useRef(intervalMs);
   useEffect(() => {
+    const resumed = !prevInterval.current && intervalMs > 0;
+    prevInterval.current = intervalMs;
+    if (resumed) run(true);
     if (!intervalMs) return;
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible') run(true);

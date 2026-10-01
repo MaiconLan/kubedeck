@@ -3,7 +3,8 @@ import {
 } from './format';
 import { t, tryT, type MessageKey } from './i18n';
 
-export type Cell = string | number | { text: string; tone?: Tone; title?: string };
+/** `plain`: render the tone as colored text instead of a badge. */
+export type Cell = string | number | { text: string; tone?: Tone; title?: string; plain?: boolean };
 
 export interface Column {
   key: string;
@@ -36,6 +37,15 @@ export const HELM_TYPE = 'helm-releases';
 /** Pseudo kinds for screens that are not resource lists. */
 export const DASHBOARD_TYPE = 'dashboard';
 export const MAP_TYPE = 'map';
+
+/** Features that exist in the code but are not released yet. */
+export const FEATURES = {
+  // Hidden until it handles namespaces with many pods/deployments well.
+  relationMap: false,
+};
+
+/** Types that are always offered, whatever the cluster's API discovery says. */
+export const BUILTIN_TYPES: string[] = [HELM_TYPE, DASHBOARD_TYPE, ...(FEATURES.relationMap ? [MAP_TYPE] : [])];
 
 const name: Column = { key: 'name', label: 'col.name', get: (o) => o.metadata?.name ?? '', sort: (o) => o.metadata?.name ?? '', grow: true };
 const namespace: Column = { key: 'ns', label: 'col.namespace', get: (o) => o.metadata?.namespace ?? '', sort: (o) => o.metadata?.namespace ?? '' };
@@ -75,7 +85,9 @@ const fluxActions: ActionName[] = ['reconcile', 'suspend', 'resume'];
 export const KINDS: Kind[] = [
   // ---- Overview screens
   { type: DASHBOARD_TYPE, label: 'Dashboard', kind: 'Dashboard', short: ['dash', 'home'], section: 'overview', columns: [] },
-  { type: MAP_TYPE, label: 'Map', kind: 'Map', short: ['map', 'graph', 'topology'], section: 'overview', columns: [] },
+  ...(FEATURES.relationMap
+    ? [{ type: MAP_TYPE, label: 'Map', kind: 'Map', short: ['map', 'graph', 'topology'], section: 'overview', columns: [] } as Kind]
+    : []),
 
   // ---- Cluster
   {
@@ -141,7 +153,7 @@ export const KINDS: Kind[] = [
       { key: 'status', label: 'col.status', get: (o) => podStatus(o), sort: (o) => podStatus(o).text },
       {
         key: 'restarts', label: 'col.restarts', align: 'right',
-        get: (o) => { const n = restarts(o); return { text: String(n), tone: n > 5 ? 'err' : n > 0 ? 'warn' : 'muted' }; },
+        get: (o) => { const n = restarts(o); return { text: String(n), tone: n > 5 ? 'err' : n > 0 ? 'warn' : 'muted', plain: true }; },
         sort: (o) => -restarts(o),
       },
       { key: 'ip', label: 'col.ip', mono: true, get: (o) => o.status?.podIP ?? '' },

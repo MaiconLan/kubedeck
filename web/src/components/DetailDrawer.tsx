@@ -26,6 +26,10 @@ interface Props {
   onNavigate: (kindName: string, name: string, ns?: string) => void;
   onAction: (action: ActionName, target: Target, obj: any) => void;
   onForward: (target: Target, obj: any) => void;
+  /** "page": fills a resource tab instead of sliding over a list. */
+  variant?: 'drawer' | 'page';
+  onOpenNewTab?: () => void;
+  onOpenNewWindow?: () => void;
 }
 
 const ACTION_META: Record<ActionName, { label: MessageKey; icon: string; danger?: boolean }> = {
@@ -38,19 +42,35 @@ const ACTION_META: Record<ActionName, { label: MessageKey; icon: string; danger?
 };
 
 export function DetailDrawer(props: Props) {
-  const { target, onClose } = props;
+  const { target, onClose, variant = 'drawer', onOpenNewTab, onOpenNewWindow } = props;
   const isHelm = target.kind.type === HELM_TYPE;
 
   return (
-    <aside className="drawer" aria-label={t('drawer.label')}>
+    <aside className={variant === 'page' ? 'drawer drawer-page' : 'drawer'} aria-label={t('drawer.label')}>
       <header className="drawer-head">
         <div className="drawer-title">
           <span className="tag">{target.kind.kind}</span>
           <h2 title={target.name}>{target.name}</h2>
           {target.ns && <span className="muted">{t('drawer.in', { ns: target.ns })}</span>}
-          <CopyButton text={target.name} label="" />
+          <CopyButton text={target.name} label={t('btn.copyName')} />
         </div>
-        <button className="btn btn-ghost" onClick={onClose} title={t('drawer.close')}><Icon name="close" /></button>
+        <div className="drawer-tools">
+          {onOpenNewTab && (
+            <button className="btn btn-ghost btn-sm" onClick={onOpenNewTab} title={t('tabs.openInTab')}>
+              <Icon name="tabNew" size={15} /><span className="label">{t('btn.openInTab')}</span>
+            </button>
+          )}
+          {onOpenNewWindow && (
+            <button className="btn btn-ghost btn-sm" onClick={onOpenNewWindow} title={t('tabs.openInWindow')}>
+              <Icon name="window" size={15} /><span className="label">{t('btn.window')}</span>
+            </button>
+          )}
+          {variant === 'drawer' && (
+            <button className="btn btn-ghost btn-sm esc-btn" onClick={onClose} title={t('drawer.close')}>
+              <Icon name="close" size={14} /><kbd>esc</kbd>
+            </button>
+          )}
+        </div>
       </header>
       {isHelm ? <HelmDetail {...props} /> : <ResourceDetail {...props} />}
     </aside>

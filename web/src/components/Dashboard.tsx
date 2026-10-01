@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { api, errorMessage, type ApiError, type DashboardData, type Part } from '../api';
 import { age, bytes, condition, cores, percent, podStatus, readyState, restarts, ts, type Tone } from '../format';
 import { useAsync } from '../hooks';
@@ -92,23 +92,36 @@ function DashboardView({ data, onOpen }: { data: DashboardData; onOpen: Props['o
       </div>
 
       <div className="tiles">
-        <Tile label={t('dash.nodes')} part={data.nodes}
-          value={`${readyNodes}/${nodes.length}`} sub={t('dash.ready')} tone={readyNodes === nodes.length ? 'ok' : 'err'} />
-        <Tile label={t('dash.pods')} part={data.pods} value={String(pods.length)}
-          sub={
-            <span className="tile-split">
-              <Count tone="ok" n={podBuckets.ok} label={t('dash.healthy')} />
-              <Count tone="warn" n={podBuckets.warn} label={t('dash.pending')} />
-              <Count tone="err" n={podBuckets.err} label={t('dash.failing')} />
-              {podBuckets.done > 0 && <Count tone="muted" n={podBuckets.done} label={t('dash.completed')} />}
-            </span>
-          } />
-        <Tile label={t('dash.workloads')} part={data.workloads}
-          value={`${workloads.length - unhealthyWorkloads.length}/${workloads.length}`} sub={t('dash.healthy')}
-          tone={unhealthyWorkloads.length ? 'warn' : 'ok'} />
+        <Tile
+          label={t('dash.nodes')} part={data.nodes} tone={readyNodes === nodes.length ? 'ok' : 'err'}
+          value={`${readyNodes}/${nodes.length}`} unit={t('dash.ready')}
+          segments={[{ tone: 'ok', n: readyNodes, label: t('dash.ready') }, { tone: 'err', n: nodes.length - readyNodes, label: 'NotReady' }]}
+        />
+        <Tile
+          label={t('dash.pods')} part={data.pods} tone={podBuckets.err ? 'err' : podBuckets.warn ? 'warn' : 'ok'}
+          value={String(pods.length)}
+          segments={[
+            { tone: 'ok', n: podBuckets.ok, label: t('dash.healthy') },
+            { tone: 'warn', n: podBuckets.warn, label: t('dash.pending') },
+            { tone: 'err', n: podBuckets.err, label: t('dash.failing') },
+            { tone: 'muted', n: podBuckets.done, label: t('dash.completed'), hideWhenZero: true },
+          ]}
+          legend
+        />
+        <Tile
+          label={t('dash.workloads')} part={data.workloads} tone={unhealthyWorkloads.length ? 'warn' : 'ok'}
+          value={`${workloads.length - unhealthyWorkloads.length}/${workloads.length}`} unit={t('dash.healthy')}
+          segments={[
+            { tone: 'ok', n: workloads.length - unhealthyWorkloads.length, label: t('dash.healthy') },
+            { tone: 'warn', n: unhealthyWorkloads.length, label: t('dash.unhealthy') },
+          ]}
+        />
         {data.flux && (
-          <Tile label="Flux" part={data.flux} value={`${fluxReady}/${flux.length}`} sub={t('dash.ready')}
-            tone={fluxReady === flux.length ? 'ok' : 'err'} />
+          <Tile
+            label="Flux" part={data.flux} tone={fluxReady === flux.length ? 'ok' : 'err'}
+            value={`${fluxReady}/${flux.length}`} unit={t('dash.ready')}
+            segments={[{ tone: 'ok', n: fluxReady, label: t('dash.ready') }, { tone: 'err', n: flux.length - fluxReady, label: t('dash.failing') }]}
+          />
         )}
       </div>
 
@@ -208,14 +221,36 @@ function DashboardView({ data, onOpen }: { data: DashboardData; onOpen: Props['o
   );
 }
 
-function Tile({ label, value, sub, tone, part }: { label: string; value: string; sub: ReactNode; tone?: Tone; part: Part<unknown> }) {
+interface Segment {
+  tone: Tone;
+  n: number;
+  label: string;
+  hideWhenZero?: boolean;
+}
+
+function Tile(props: { label: string; value: string; unit?: string; tone?: Tone; part: Part<unknown>; segments: Segment[]; legend?: boolean }) {
+  const { label, value, unit, tone, part, segments, legend } = props;
+  const shown = segments.filter((s) => !(s.hideWhenZero && s.n === 0));
   return (
     <div className={`tile${tone ? ` tile-${tone}` : ''}`}>
-      <div className="tile-label">{label}</div>
+      <div className="tile-head">
+        <span className="tile-dot" />
+        <span className="tile-label">{label}</span>
+      </div>
       {part.ok ? (
         <>
-          <div className="tile-value">{value}</div>
-          <div className="tile-sub">{sub}</div>
+          <div className="tile-main">
+            <span className="tile-value">{value}</span>
+            {unit && <span className="tile-unit">{unit}</span>}
+          </div>
+          <div className="tile-bar">
+            {shown.filter((s) => s.n > 0).map((s) => <span key={s.label} className={`seg-${s.tone}`} style={{ flex: s.n }} title={`${s.n} ${s.label}`} />)}
+          </div>
+          {legend && (
+            <div className="tile-split tile-sub">
+              {shown.map((s) => <Count key={s.label} tone={s.tone} n={s.n} label={s.label} />)}
+            </div>
+          )}
         </>
       ) : <div className="tile-sub muted" title={errorMessage(part.error)}>{t('dash.unavailable')}</div>}
     </div>
@@ -223,7 +258,7 @@ function Tile({ label, value, sub, tone, part }: { label: string; value: string;
 }
 
 function Count({ tone, n, label }: { tone: Tone; n: number; label: string }) {
-  return <span className={`count-dot dot-${tone}`} title={label}><i />{n} {label}</span>;
+  return <span className={`count-dot dot-${tone}`} title={label}><i /><span className="n">{n}</span> {label}</span>;
 }
 
 function PartError({ part }: { part: Part<unknown> | null }) {

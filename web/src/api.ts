@@ -44,6 +44,26 @@ function readToken(): string {
 
 const token = readToken();
 
+/** Session token, for opening another window of this same server. */
+export function sessionToken(): string {
+  return token;
+}
+
+/** True inside the Electron desktop app. */
+export const isDesktop = /\bElectron\//.test(navigator.userAgent);
+
+// Several tabs often share a context: share their discovery/namespace calls.
+const shared = new Map<string, { at: number; promise: Promise<unknown> }>();
+
+function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+  const hit = shared.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.promise as Promise<T>;
+  const promise = load();
+  shared.set(key, { at: Date.now(), promise });
+  promise.catch(() => shared.delete(key));
+  return promise;
+}
+
 function qs(params: Record<string, string | number | boolean | undefined>): string {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -74,8 +94,12 @@ export const api = {
   settings: () => request<Settings>('GET', '/api/settings'),
   saveSettings: (patch: Partial<Settings>) => request<Settings>('PUT', '/api/settings', {}, patch),
   commands: () => request<CommandEntry[]>('GET', '/api/commands'),
-  namespaces: (ctx: string) => request<{ forbidden: boolean; names: string[] }>('GET', '/api/namespaces', { ctx }),
-  discovery: (ctx: string, fresh = false) => request<ApiResource[]>('GET', '/api/discovery', { ctx, fresh }),
+  namespaces: (ctx: string) =>
+    cached(`ns:${ctx}`, 30_000, () => request<{ forbidden: boolean; names: string[] }>('GET', '/api/namespaces', { ctx })),
+  discovery: (ctx: string, fresh = false) =>
+    fresh
+      ? request<ApiResource[]>('GET', '/api/discovery', { ctx, fresh })
+      : cached(`disc:${ctx}`, 120_000, () => request<ApiResource[]>('GET', '/api/discovery', { ctx })),
   list: (ctx: string, type: string, ns: string, filter: { labels?: string; fields?: string } = {}) =>
     request<{ namespaced: boolean; items: any[] }>('GET', '/api/list', { ctx, type, ns, ...filter }),
   dashboard: (ctx: string, ns: string) => request<DashboardData>('GET', '/api/dashboard', { ctx, ns }),
@@ -209,6 +233,8 @@ export interface Settings {
   lastNamespace: Record<string, string>;
   knownNamespaces: Record<string, string[]>;
   contextColors: Record<string, string>;
+  /** Saved tabs and panes of the main window (see tabs.ts). */
+  layout?: unknown;
 }
 
 export interface ApiResource {

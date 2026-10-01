@@ -1,28 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type ContextInfo, type PortForward, type Settings } from './api';
-import {
-  DASHBOARD_TYPE, HELM_TYPE, KIND_BY_TYPE, KINDS, MAP_TYPE, genericKind, isScreen, kindByName, kindLabel,
-  type ActionName, type Kind,
-} from './catalog';
-import { ActionDialog } from './components/ActionDialog';
+import { api, isDesktop, sessionToken, type ContextInfo, type PortForward, type Settings } from './api';
+import { BUILTIN_TYPES, DASHBOARD_TYPE, HELM_TYPE, KIND_BY_TYPE, KINDS, genericKind, kindLabel } from './catalog';
 import { AddClusterDialog } from './components/AddClusterDialog';
 import { CommandLog } from './components/CommandLog';
 import { CommandPalette, type PaletteItem } from './components/CommandPalette';
-import { Dashboard } from './components/Dashboard';
-import { DetailDrawer, type Target } from './components/DetailDrawer';
-import { ForwardDialog, ForwardsPanel } from './components/PortForward';
-import { RelationMap } from './components/RelationMap';
-import { ResourceTable, rowKey } from './components/ResourceTable';
+import type { Target } from './components/DetailDrawer';
+import { ForwardsPanel } from './components/PortForward';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { Sidebar } from './components/Sidebar';
+import { TabBar } from './components/TabBar';
+import { ALL, TabView } from './components/TabView';
 import { Empty, ErrorBanner, Icon, Spinner } from './components/ui';
 import { isTyping, useAsync, useKey } from './hooks';
 import { detectLanguage, LANGUAGES, setLanguage, t, type Language } from './i18n';
-import { buildHash, GO_KEYS, parseHash } from './route';
-
-const ALL = '*';
-const DEFAULT_KIND = KIND_BY_TYPE.get(DASHBOARD_TYPE)!;
-const MAX_RECENT = 8;
+import { GO_KEYS } from './route';
+import {
+  activate, activeTab, addTab, closeTab, cycleTab, goBack, goForward, hashForTab, MAX_PANES, moveTab,
+  navigate, newTab, restore, routeFromHash, selectIndex, serialize, singlePane, splitRight,
+  type Layout, type Route,
+} from './tabs';
 
 export function App() {
   const [adding, setAdding] = useState(false);
@@ -59,136 +55,134 @@ export function App() {
       </div>
     );
   }
-  return <Workspace initialSettings={boot.data.settings} contexts={boot.data.contexts.contexts} current={boot.data.contexts.current} />;
-}
-
-/** Catalog entry for a type; unknown types (CRDs) get a placeholder until discovery loads. */
-function kindForType(type: string): Kind {
-  return KIND_BY_TYPE.get(type) ?? genericKind({ type, kind: type.split('.')[0], name: type.split('.')[0], shortNames: [], namespaced: true });
+  return <Shell initialSettings={boot.data.settings} contexts={boot.data.contexts.contexts} current={boot.data.contexts.current} />;
 }
 
 type BottomPanel = 'commands' | 'forwards' | null;
 
-function Workspace({ initialSettings, contexts: initialContexts, current }: { initialSettings: Settings; contexts: ContextInfo[]; current: string }) {
+interface RecentItem {
+  ctx: string;
+  target: Target;
+}
+
+const MAX_RECENT = 8;
+
+/** Windows opened from another window start from a single tab and don't overwrite the saved layout. */
+const fromHash = routeFromHash(window.location.hash);
+const isSecondaryWindow = (() => {
+  // Remembered per window, so reloading a secondary window keeps it secondary.
+  const key = 'kubedeck.secondary';
+  try {
+    if (fromHash || /[#&]new\b/.test(window.location.hash)) sessionStorage.setItem(key, '1');
+    return sessionStorage.getItem(key) === '1';
+  } catch {
+    return !!fromHash;
+  }
+})();
+
+function Shell({ initialSettings, contexts: initialContexts, current }: { initialSettings: Settings; contexts: ContextInfo[]; current: string }) {
   const [settings, setSettings] = useState(initialSettings);
   const [contexts, setContexts] = useState(initialContexts);
   const names = contexts.map((c) => c.name);
 
-  // The URL wins over saved preferences, so links and reloads land on the same screen.
-  const initialRoute = useMemo(() => {
-    const r = parseHash(window.location.hash);
-    return r && names.includes(r.ctx) ? r : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const defaultRoute = (ctx?: string): Route => {
+    const c = ctx && names.includes(ctx) ? ctx : settings.lastContext && names.includes(settings.lastContext) ? settings.lastContext : current || names[0];
+    const info = contexts.find((x) => x.name === c);
+    return { ctx: c, ns: settings.lastNamespace[c] ?? info?.namespace ?? ALL, type: DASHBOARD_TYPE };
+  };
 
-  const [ctx, setCtx] = useState(() =>
-    initialRoute?.ctx ?? (settings.lastContext && names.includes(settings.lastContext) ? settings.lastContext : current || names[0]),
-  );
-  const ctxInfo = contexts.find((c) => c.name === ctx);
-  const [ns, setNs] = useState(() => initialRoute?.ns ?? settings.lastNamespace[ctx] ?? ctxInfo?.namespace ?? ALL);
-  const [kind, setKind] = useState<Kind>(() => (initialRoute ? kindForType(initialRoute.type) : DEFAULT_KIND));
-  const [target, setTarget] = useState<Target | null>(() =>
-    initialRoute?.target ? { kind: kindForType(initialRoute.target.type), name: initialRoute.target.name, ns: initialRoute.target.ns } : null,
-  );
-  const [filter, setFilter] = useState('');
+  const [layout, setLayout] = useState<Layout>(() => {
+    if (fromHash && names.includes(fromHash.route.ctx)) return singlePane(newTab(fromHash.route, fromHash.detail));
+    if (!isSecondaryWindow) {
+      const saved = restore(settings.layout, names);
+      if (saved) return saved;
+    }
+    return singlePane(newTab(defaultRoute()));
+  });
   const [paused, setPaused] = useState(false);
-  const [dialog, setDialog] = useState<{ action: ActionName; target: Target; obj: any } | null>(null);
-  const [forwardFor, setForwardFor] = useState<{ target: Target; obj: any } | null>(null);
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
   const [panel, setPanel] = useState<BottomPanel>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [recent, setRecent] = useState<Target[]>([]);
-  const filterRef = useRef<HTMLInputElement>(null);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
   const goPending = useRef(0);
 
   const language: Language = settings.language ?? detectLanguage();
   setLanguage(language);
 
-  const isProtected = settings.protectedContexts.includes(ctx);
-  const refreshMs = paused ? 0 : settings.refreshSeconds * 1000;
-  const screen = isScreen(kind);
+  const focusedTab = activeTab(layout);
+  const ctx = focusedTab.route.ctx;
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
+
+  useEffect(() => {
+    if (isSecondaryWindow) window.history.replaceState(null, '', window.location.pathname);
+  }, []);
 
   const save = useCallback((patch: Partial<Settings>) => {
     setSettings((s) => ({ ...s, ...patch, lastNamespace: { ...s.lastNamespace, ...(patch.lastNamespace ?? {}) } }));
     api.saveSettings(patch).catch(() => { /* preferences are best-effort */ });
   }, []);
 
-  // ---- data
+  // Persist the main window's tabs (debounced).
+  useEffect(() => {
+    if (isSecondaryWindow) return;
+    const id = window.setTimeout(() => {
+      api.saveSettings({ layout: serialize(layout) }).catch(() => {});
+    }, 800);
+    return () => window.clearTimeout(id);
+  }, [layout]);
+
+  // Window title follows the focused tab (useful in the taskbar with several windows).
+  useEffect(() => {
+    const r = focusedTab.route;
+    document.title = `${r.target ? r.target.name : kindLabel(KIND_BY_TYPE.get(r.type) ?? KINDS[0])} · ${r.ctx} — KubeDeck`;
+  }, [focusedTab.route, language]);
+
+  // ---- shared data for the sidebar and quick navigation (focused tab's context)
   const namespaces = useAsync(() => api.namespaces(ctx), [ctx]);
   const discovery = useAsync(() => api.discovery(ctx), [ctx]);
   const available = useMemo(() => {
     if (!discovery.data) return null;
-    return new Set([...discovery.data.map((r) => r.type), HELM_TYPE, DASHBOARD_TYPE, MAP_TYPE]);
+    return new Set([...discovery.data.map((r) => r.type), ...BUILTIN_TYPES]);
   }, [discovery.data]);
-
-  const list = useAsync(
-    async () => {
-      if (isScreen(kind)) return null;
-      if (kind.type === HELM_TYPE) return { namespaced: true, items: await api.helmReleases(ctx, ns) };
-      return api.list(ctx, kind.type, ns);
-    },
-    [ctx, kind.type, ns],
-    screen ? 0 : refreshMs,
-  );
 
   const forwards = useAsync(() => api.forwards(), [], 3000);
   const activeForwards = (forwards.data ?? []).filter((f) => f.status === 'active').length;
   const failedForwards = (forwards.data ?? []).some((f) => f.status === 'error');
 
-  // A kind missing from this cluster (e.g. no Flux) falls back to the dashboard;
-  // a CRD placeholder from the URL gets its real definition once discovery loads.
-  useEffect(() => {
-    if (!available || !discovery.data) return;
-    if (kind.section === 'crds') {
-      const res = discovery.data.find((r) => r.type === kind.type);
-      if (res && res.kind !== kind.kind) setKind(genericKind(res));
-      else if (!res) setKind(DEFAULT_KIND);
-    } else if (!available.has(kind.type)) {
-      setKind(DEFAULT_KIND);
-    }
-  }, [available, discovery.data, kind]);
+  // ---- tab operations
+  const nav = (tabId: string, patch: Partial<Route>, opts?: { detail?: boolean; replace?: boolean }) =>
+    setLayout((l) => navigate(l, tabId, patch, opts));
 
-  // When namespaces cannot be listed, "all namespaces" will fail too: pick a concrete one.
-  useEffect(() => {
-    if (namespaces.data?.forbidden && ns === ALL) setNs(ctxInfo?.namespace || settings.knownNamespaces[ctx]?.[0] || 'default');
-  }, [namespaces.data, ns, ctx, ctxInfo, settings.knownNamespaces]);
+  const openTab = (route: Route, detail: boolean, paneId?: string) => setLayout((l) => addTab(l, newTab(route, detail), paneId));
 
-  // ---- URL sync: every navigation becomes a history entry
-  const firstSync = useRef(true);
-  useEffect(() => {
-    const hash = buildHash({ ctx, ns, type: kind.type, target: target ? { type: target.kind.type, ns: target.ns, name: target.name } : undefined });
-    if (hash === window.location.hash) return;
-    if (firstSync.current) window.history.replaceState(null, '', hash);
-    else window.history.pushState(null, '', hash);
-    firstSync.current = false;
-  }, [ctx, ns, kind.type, target]);
+  const openWindow = (route: Route, detail: boolean) => {
+    const url = `${window.location.origin}/?t=${encodeURIComponent(sessionToken())}${hashForTab(newTab(route, detail))}`;
+    window.open(url, '_blank');
+  };
 
-  useEffect(() => {
-    const onPop = () => {
-      const r = parseHash(window.location.hash);
-      if (!r || !names.includes(r.ctx)) return;
-      setCtx(r.ctx);
-      setNs(r.ns);
-      setKind(kindForType(r.type));
-      setTarget(r.target ? { kind: kindForType(r.target.type), name: r.target.name, ns: r.target.ns } : null);
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [names.join()]);
+  const closeTabById = (tabId: string) => setLayout((l) => closeTab(l, tabId, () => newTab(defaultRoute(activeTab(l).route.ctx))));
 
-  // ---- navigation
-  const openTarget = (next: Target | null) => {
-    setTarget(next);
-    if (next && next.kind.type !== HELM_TYPE) {
-      setRecent((r) => [next, ...r.filter((x) => !(x.kind.type === next.kind.type && x.name === next.name && x.ns === next.ns))].slice(0, MAX_RECENT));
-    }
+  const showToast = (text: string) => {
+    setToast(text);
+    window.setTimeout(() => setToast((x) => (x === text ? null : x)), 4000);
+  };
+
+  const visit = (visitCtx: string, target: Target) => {
+    if (target.kind.type === HELM_TYPE) return;
+    setRecent((r) => [{ ctx: visitCtx, target }, ...r.filter((x) => !(x.ctx === visitCtx && x.target.kind.type === target.kind.type && x.target.name === target.name && x.target.ns === target.ns))].slice(0, MAX_RECENT));
+  };
+
+  const goToType = (type: string) => nav(focusedTab.id, { type, target: undefined }, { detail: false });
+
+  const switchContext = (name: string, list = contexts) => {
+    const info = list.find((c) => c.name === name);
+    nav(focusedTab.id, { ctx: name, ns: settings.lastNamespace[name] ?? info?.namespace ?? ALL, target: undefined }, { detail: false });
+    save({ lastContext: name });
   };
 
   const clusterAdded = async (name: string, protect: boolean) => {
@@ -200,110 +194,59 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
     } catch {
       /* the list refreshes on next load */
     }
-    if (protect && !settings.protectedContexts.includes(name)) {
-      save({ protectedContexts: [...settings.protectedContexts, name] });
-    }
+    if (protect && !settings.protectedContexts.includes(name)) save({ protectedContexts: [...settings.protectedContexts, name] });
     switchContext(name, fresh);
     showToast(t('content.clusterAdded', { name }));
   };
 
-  const switchContext = (name: string, list = contexts) => {
-    setCtx(name);
-    setTarget(null);
-    setFilter('');
-    const info = list.find((c) => c.name === name);
-    setNs(settings.lastNamespace[name] ?? info?.namespace ?? ALL);
-    save({ lastContext: name });
-  };
-
-  const switchNamespace = (value: string) => {
-    setNs(value);
-    setTarget(null);
-    save({ lastNamespace: { [ctx]: value } });
-    if (namespaces.data?.forbidden && value !== ALL) {
-      const known = settings.knownNamespaces[ctx] ?? [];
-      if (!known.includes(value)) save({ knownNamespaces: { ...settings.knownNamespaces, [ctx]: [value, ...known].slice(0, 30) } });
-    }
-  };
-
-  const selectKind = (k: Kind) => {
-    setKind(k);
-    setTarget(null);
-    setFilter('');
-  };
-
-  const openItem = (item: any) => {
-    if (kind.type === HELM_TYPE) openTarget({ kind, name: item.name, ns: item.namespace, row: item });
-    else openTarget({ kind, name: item.metadata.name, ns: item.metadata.namespace });
-  };
-
-  /** Opens a resource by Kind name and switches the list to that kind (keeps screens in place). */
-  const navigateTo = (kindName: string, name: string, targetNs?: string) => {
-    const k = kindByName(kindName);
-    if (!k) return;
-    if (!screen) setKind(k);
-    setFilter('');
-    openTarget({ kind: k, name, ns: targetNs });
-  };
-
-  const toggleProtected = () => {
-    const next = isProtected
-      ? settings.protectedContexts.filter((c) => c !== ctx)
-      : [...settings.protectedContexts, ctx];
-    save({ protectedContexts: next });
-  };
-
-  const showToast = (text: string) => {
-    setToast(text);
-    window.setTimeout(() => setToast((x) => (x === text ? null : x)), 4000);
-  };
-
   // ---- keyboard
-  const modalOpen = !!(dialog || palette || help || adding || forwardFor);
   useKey((e) => {
-    if (modalOpen) return;
-    if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === ':' && !isTyping(e))) {
+    if (document.querySelector('.modal-backdrop')) return;
+    const mod = e.ctrlKey || e.metaKey;
+
+    if ((e.key === 'k' && mod) || (e.key === ':' && !isTyping(e))) {
       e.preventDefault();
       setPalette(true);
       return;
     }
-    if (isTyping(e)) {
-      if (e.key === 'Escape') (e.target as HTMLElement).blur();
-      return;
+    // Browser tabs own Ctrl+T/W/Tab; the desktop app gives them to KubeDeck tabs.
+    if (isDesktop && mod) {
+      const k = e.key.toLowerCase();
+      if (k === 't') { e.preventDefault(); openTab({ ...focusedTab.route, type: DASHBOARD_TYPE, target: undefined }, false); return; }
+      if (k === 'w') { e.preventDefault(); closeTabById(focusedTab.id); return; }
+      if (e.key === 'Tab') { e.preventDefault(); setLayout((l) => cycleTab(l, e.shiftKey ? -1 : 1)); return; }
+      if (k === 'n') { e.preventDefault(); openWindow(focusedTab.route, focusedTab.detail); return; }
+      if (e.key === '\\') { e.preventDefault(); setLayout((l) => splitRight(l, activeTab(l).id)); return; }
+      if (/^[1-9]$/.test(e.key)) { e.preventDefault(); setLayout((l) => selectIndex(l, Number(e.key) - 1)); return; }
     }
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); setLayout((l) => goBack(l, activeTab(l).id)); return; }
+    if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); setLayout((l) => goForward(l, activeTab(l).id)); return; }
+    if (isTyping(e) || mod || e.altKey) return;
 
     if (Date.now() - goPending.current < 1200) {
       goPending.current = 0;
       if (e.key === 'f') return setPanel((p) => (p === 'forwards' ? null : 'forwards'));
       if (e.key === 'l') return setPanel((p) => (p === 'commands' ? null : 'commands'));
+      if (e.key === 't') return openTab({ ...focusedTab.route, type: DASHBOARD_TYPE, target: undefined }, false);
+      if (e.key === 'w') return closeTabById(focusedTab.id);
       const go = GO_KEYS.find((g) => g.key === e.key);
-      const k = go && KIND_BY_TYPE.get(go.type);
-      if (k && (!available || available.has(k.type))) selectKind(k);
+      if (go && (!available || available.has(go.type))) goToType(go.type);
       return;
     }
     if (e.key === 'g') goPending.current = Date.now();
     else if (e.key === '?') setHelp(true);
-    else if (e.key === '/') {
-      e.preventDefault();
-      filterRef.current?.focus();
-    } else if (e.key === 'Escape') {
-      if (target) setTarget(null);
-      else if (panel) setPanel(null);
-    }
+    else if (e.key === 'Escape' && panel && !(focusedTab.route.target && !focusedTab.detail)) setPanel(null);
   });
 
   const paletteItems = useMemo<PaletteItem[]>(() => {
+    const tabId = focusedTab.id;
     const recentItems: PaletteItem[] = recent.map((r) => ({
-      id: `recent:${r.kind.type}/${r.ns}/${r.name}`,
+      id: `recent:${r.ctx}/${r.target.kind.type}/${r.target.ns}/${r.target.name}`,
       group: t('palette.recent'),
-      label: `${r.kind.kind}/${r.name}`,
-      hint: r.ns,
-      keywords: ['recent', r.name.toLowerCase(), r.kind.kind.toLowerCase()],
-      run: () => {
-        if (!screen) setKind(r.kind);
-        openTarget(r);
-      },
+      label: `${r.target.kind.kind}/${r.target.name}`,
+      hint: [r.target.ns, r.ctx].filter(Boolean).join(' · '),
+      keywords: ['recent', r.target.name.toLowerCase(), r.target.kind.kind.toLowerCase()],
+      run: () => openTab({ ctx: r.ctx, ns: focusedTab.route.ns, type: r.target.kind.type, target: { type: r.target.kind.type, name: r.target.name, ns: r.target.ns } }, true),
     }));
     const kinds: PaletteItem[] = [
       ...KINDS.filter((k) => !available || available.has(k.type)),
@@ -314,7 +257,7 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
       label: kindLabel(k),
       hint: k.short.join(', '),
       keywords: [...k.short, kindLabel(k).toLowerCase(), k.kind.toLowerCase(), k.type],
-      run: () => selectKind(k),
+      run: () => goToType(k.type),
     }));
     const ctxItems: PaletteItem[] = names.map((n) => ({
       id: `ctx:${n}`, group: t('palette.context'), label: n, keywords: ['ctx', 'context', n.toLowerCase()], run: () => switchContext(n),
@@ -322,227 +265,148 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
     const nsList = namespaces.data?.forbidden ? settings.knownNamespaces[ctx] ?? [] : namespaces.data?.names ?? [];
     const nsItems: PaletteItem[] = [ALL, ...nsList].map((n) => ({
       id: `ns:${n}`, group: t('palette.namespace'), label: n === ALL ? t('palette.allNamespaces') : n,
-      keywords: ['ns', 'namespace', n.toLowerCase()], run: () => switchNamespace(n),
+      keywords: ['ns', 'namespace', n.toLowerCase()],
+      run: () => {
+        nav(tabId, { ns: n });
+        save({ lastNamespace: { [ctx]: n } });
+      },
     }));
+    const tool = (id: string, label: string, keywords: string[], run: () => void): PaletteItem => ({
+      id, group: t('palette.tools'), label, keywords: [...keywords, label.toLowerCase()], run,
+    });
     const tools: PaletteItem[] = [
-      {
-        id: 'add-aks', group: t('palette.context'), label: t('palette.addAks'),
-        keywords: ['add', 'aks', 'azure', 'cluster', t('palette.addAks').toLowerCase()], run: () => setAdding(true),
-      },
-      {
-        id: 'forwards', group: t('palette.tools'), label: t('pf.panelTitle'),
-        keywords: ['pf', 'port', 'forward', t('pf.panelTitle').toLowerCase()], run: () => setPanel('forwards'),
-      },
-      {
-        id: 'commands', group: t('palette.tools'), label: t('cmdlog.title'),
-        keywords: ['log', 'commands', t('cmdlog.title').toLowerCase()], run: () => setPanel('commands'),
-      },
-      {
-        id: 'help', group: t('palette.tools'), label: t('keys.title'),
-        keywords: ['help', 'keys', 'shortcuts', t('keys.title').toLowerCase()], run: () => setHelp(true),
-      },
+      tool('tab-new', t('tabs.new'), ['tab', 'new'], () => openTab({ ...focusedTab.route, type: DASHBOARD_TYPE, target: undefined }, false)),
+      tool('tab-split', t('tabs.split'), ['split', 'pane'], () => setLayout((l) => splitRight(l, activeTab(l).id))),
+      tool('tab-window', t('tabs.openInWindow'), ['window'], () => openWindow(focusedTab.route, focusedTab.detail)),
+      tool('tab-close', t('tabs.close'), ['close', 'tab'], () => closeTabById(tabId)),
+      { ...tool('add-aks', t('palette.addAks'), ['add', 'aks', 'azure', 'cluster'], () => setAdding(true)), group: t('palette.context') },
+      tool('forwards', t('pf.panelTitle'), ['pf', 'port', 'forward'], () => setPanel('forwards')),
+      tool('commands', t('cmdlog.title'), ['log', 'commands'], () => setPanel('commands')),
+      tool('help', t('keys.title'), ['help', 'keys', 'shortcuts'], () => setHelp(true)),
     ];
     return [...recentItems, ...kinds, ...ctxItems, ...tools, ...nsItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [available, discovery.data, names.join(), namespaces.data, ctx, settings.knownNamespaces, language, recent, screen]);
+  }, [available, discovery.data, names.join(), namespaces.data, ctx, focusedTab, settings.knownNamespaces, language, recent]);
 
-  const items = list.data?.items ?? [];
-  const showNamespaceCol = ns === ALL;
-  const selectedKey = target
-    ? items.map(rowKey).find((_, i) => (items[i].metadata?.name ?? items[i].name) === target.name)
-    : undefined;
+  const sidebarFooter = (
+    <>
+      <div className="side-row">
+        <div className="segmented">
+          <button className={paused ? 'paused' : ''} onClick={() => setPaused(!paused)} title={paused ? t('topbar.resume') : t('topbar.pause')}>
+            <Icon name={paused ? 'play' : 'pause'} size={14} />
+            {paused ? t('btn.paused') : t('btn.live')}
+          </button>
+          <select value={settings.refreshSeconds} onChange={(e) => save({ refreshSeconds: Number(e.target.value) })} title={t('topbar.interval')}>
+            {[2, 5, 10, 30, 60].map((s) => <option key={s} value={s}>{t('btn.every', { n: s })}</option>)}
+          </select>
+        </div>
+        <select className="select-sm lang" value={language} onChange={(e) => save({ language: e.target.value as Language })} title={t('topbar.language')}>
+          {LANGUAGES.map((l) => <option key={l.id} value={l.id} title={l.label}>{l.short}</option>)}
+        </select>
+      </div>
+      <div className="side-grid">
+        <button className={`side-btn${panel === 'forwards' ? ' active' : ''}`} onClick={() => setPanel(panel === 'forwards' ? null : 'forwards')} title={t('pf.panelTitle')}>
+          <Icon name="plug" size={15} />
+          <span className="label">{t('btn.forwards')}</span>
+          {(activeForwards > 0 || failedForwards) && <span className={`pill-badge${failedForwards ? ' err' : ''}`}>{activeForwards || '!'}</span>}
+        </button>
+        <button className={`side-btn${panel === 'commands' ? ' active' : ''}`} onClick={() => setPanel(panel === 'commands' ? null : 'commands')} title={t('topbar.commands')}>
+          <Icon name="terminal" size={15} />
+          <span className="label">{t('btn.commands')}</span>
+        </button>
+        <button className="side-btn" onClick={() => setPalette(true)} title={t('topbar.goTo')}>
+          <kbd>:</kbd>
+          <span className="label">{t('btn.goTo')}</span>
+        </button>
+        <button className="side-btn" onClick={() => setHelp(true)} title={t('keys.title')}>
+          <Icon name="keyboard" size={15} />
+          <span className="label">{t('btn.shortcuts')}</span>
+        </button>
+        <button className="side-btn wide" onClick={() => save({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} title={t('topbar.theme')}>
+          <Icon name={settings.theme === 'dark' ? 'sun' : 'moon'} size={15} />
+          <span className="label">{settings.theme === 'dark' ? t('btn.lightTheme') : t('btn.darkTheme')}</span>
+        </button>
+      </div>
+    </>
+  );
 
   return (
-    <div className={`app${target ? ' with-drawer' : ''}`}>
-      <Sidebar available={available} discovery={discovery.data ?? []} current={kind.type} onSelect={selectKind} />
+    <div className="app">
+      <Sidebar
+        available={available}
+        discovery={discovery.data ?? []}
+        current={focusedTab.detail ? '' : focusedTab.route.type}
+        onSelect={(k) => goToType(k.type)}
+        footer={sidebarFooter}
+      />
 
-      <main className="main">
-        <header className={`topbar${isProtected ? ' protected' : ''}`}>
-          <div className="history-nav">
-            <button className="btn btn-ghost btn-sm" onClick={() => window.history.back()} title={t('topbar.back')}><Icon name="back" /></button>
-            <button className="btn btn-ghost btn-sm" onClick={() => window.history.forward()} title={t('topbar.forward')}><Icon name="forward" /></button>
-          </div>
-
-          <div className="picker">
-            <label>{t('topbar.context')}</label>
-            <select value={ctx} onChange={(e) => switchContext(e.target.value)} title={ctxInfo?.server}>
-              {names.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <button
-              className={`btn btn-ghost btn-sm lock${isProtected ? ' on' : ''}`}
-              onClick={toggleProtected}
-              title={isProtected ? t('topbar.protectedOn') : t('topbar.protectedOff')}
+      <main className="panes" style={{ gridTemplateColumns: `repeat(${layout.panes.length}, minmax(0, 1fr))` }}>
+        {layout.panes.map((pane) => {
+          const paneFocused = pane.id === layout.focused;
+          return (
+            <section
+              key={pane.id}
+              className={`pane${paneFocused && layout.panes.length > 1 ? ' focused' : ''}`}
+              onMouseDownCapture={() => !paneFocused && setLayout((l) => ({ ...l, focused: pane.id }))}
             >
-              <Icon name={isProtected ? 'lock' : 'unlock'} />
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setAdding(true)} title={t('topbar.addCluster')}>
-              <Icon name="plus" />
-            </button>
-          </div>
-
-          <div className="picker">
-            <label>{t('topbar.namespace')}</label>
-            {namespaces.data?.forbidden ? (
-              <NamespaceInput value={ns} options={settings.knownNamespaces[ctx] ?? []} onCommit={switchNamespace} />
-            ) : (
-              <select value={ns} onChange={(e) => switchNamespace(e.target.value)} disabled={!namespaces.data && !namespaces.error}>
-                <option value={ALL}>{t('topbar.allNamespaces')}</option>
-                {(namespaces.data?.names ?? (ns !== ALL ? [ns] : [])).map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            )}
-          </div>
-
-          {kind.type !== DASHBOARD_TYPE ? (
-            <div className="search-box grow">
-              <Icon name="search" size={14} />
-              <input ref={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('topbar.filter', { kind: kindLabel(kind).toLowerCase() })} />
-              {filter && <button className="btn btn-ghost btn-xs" onClick={() => setFilter('')}><Icon name="close" size={12} /></button>}
-            </div>
-          ) : <span className="spacer" />}
-
-          <button className="btn btn-ghost" onClick={() => setPalette(true)} title={t('topbar.goTo')}>
-            <kbd>:</kbd>
-          </button>
-          <div className="refresh">
-            <button className="btn btn-ghost btn-sm" onClick={() => setPaused(!paused)} title={paused ? t('topbar.resume') : t('topbar.pause')}>
-              <Icon name={paused ? 'play' : 'pause'} />
-            </button>
-            <select
-              value={settings.refreshSeconds}
-              onChange={(e) => save({ refreshSeconds: Number(e.target.value) })}
-              className="select-sm"
-              title={t('topbar.interval')}
-            >
-              {[2, 5, 10, 30, 60].map((s) => <option key={s} value={s}>{s}s</option>)}
-            </select>
-            {!screen && (
-              <button className="btn btn-ghost btn-sm" onClick={list.reload} title={t('topbar.refreshNow')}>
-                {list.loading ? <Spinner small /> : <Icon name="refresh" />}
-              </button>
-            )}
-          </div>
-          <button
-            className={`btn btn-ghost badge-btn${panel === 'forwards' ? ' active' : ''}`}
-            onClick={() => setPanel(panel === 'forwards' ? null : 'forwards')}
-            title={t('pf.panelTitle')}
-          >
-            <Icon name="plug" />
-            {(activeForwards > 0 || failedForwards) && <span className={`btn-badge${failedForwards ? ' err' : ''}`}>{activeForwards || '!'}</span>}
-          </button>
-          <button className={`btn btn-ghost${panel === 'commands' ? ' active' : ''}`} onClick={() => setPanel(panel === 'commands' ? null : 'commands')} title={t('topbar.commands')}>
-            <Icon name="terminal" />
-          </button>
-          <button className="btn btn-ghost" onClick={() => setHelp(true)} title={t('keys.title')}>
-            <Icon name="keyboard" />
-          </button>
-          <select
-            className="select-sm lang"
-            value={language}
-            onChange={(e) => save({ language: e.target.value as Language })}
-            title={t('topbar.language')}
-          >
-            {LANGUAGES.map((l) => <option key={l.id} value={l.id} title={l.label}>{l.short}</option>)}
-          </select>
-          <button className="btn btn-ghost" onClick={() => save({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} title={t('topbar.theme')}>
-            <Icon name={settings.theme === 'dark' ? 'sun' : 'moon'} />
-          </button>
-        </header>
-
-        <section className="content">
-          <div className="content-head">
-            <span className="crumb">{t(`section.${kind.section}`)}</span>
-            <span className="crumb-sep">›</span>
-            <h1>{kindLabel(kind)}</h1>
-            {!screen && <span className="count">{list.data ? items.length : ''}</span>}
-            <span className="muted small">{kind.section === 'crds' ? kind.type : ''}</span>
-            <span className="spacer" />
-            <span className="muted small ctx-summary">
-              {ctx} · {list.data?.namespaced === false ? t('content.clusterScoped') : ns === ALL ? t('content.allNamespaces') : ns}
-            </span>
-          </div>
-
-          {kind.type === DASHBOARD_TYPE && (
-            <div className="screen-scroll">
-              <Dashboard ctx={ctx} ns={ns} refreshMs={refreshMs} onOpen={navigateTo} />
-            </div>
-          )}
-          {kind.type === MAP_TYPE && (
-            <RelationMap ctx={ctx} ns={ns} available={available} filter={filter} refreshMs={refreshMs} onOpen={navigateTo} />
-          )}
-
-          {!screen && (
-            <>
-              {discovery.error && discovery.error.kind === 'auth' && !list.error && <ErrorBanner error={discovery.error} onRetry={discovery.reload} />}
-              {list.error && <ErrorBanner error={list.error} onRetry={() => { list.reload(); discovery.reload(); namespaces.reload(); }} />}
-
-              {!list.data && !list.error && <div className="loading-rows">{Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton" />)}</div>}
-              {list.data && items.length === 0 && (
-                <Empty title={t('content.emptyTitle', { kind: kindLabel(kind).toLowerCase() })}>
-                  {ns !== ALL && list.data.namespaced ? t('content.emptyNamespace', { ns }) : null}
-                </Empty>
-              )}
-              {list.data && items.length > 0 && (
-                <ResourceTable
-                  kind={kind}
-                  items={items}
-                  filter={filter}
-                  showNamespace={showNamespaceCol}
-                  selectedKey={selectedKey}
-                  onOpen={openItem}
-                />
-              )}
-            </>
-          )}
-        </section>
+              <TabBar
+                pane={pane}
+                focused={paneFocused}
+                canSplit={layout.panes.length < MAX_PANES}
+                canClosePane={layout.panes.length > 1}
+                protectedContexts={settings.protectedContexts}
+                onActivate={(tabId) => setLayout((l) => activate(l, pane.id, tabId))}
+                onClose={closeTabById}
+                onNew={() => {
+                  const base = pane.tabs.find((x) => x.id === pane.active)?.route ?? defaultRoute();
+                  openTab({ ...base, type: DASHBOARD_TYPE, target: undefined }, false, pane.id);
+                }}
+                onSplit={() => setLayout((l) => splitRight(l, pane.active))}
+                onWindow={() => {
+                  const tab = pane.tabs.find((x) => x.id === pane.active);
+                  if (tab) openWindow(tab.route, tab.detail);
+                }}
+                onClosePane={() => setLayout((l) => {
+                  let next = l;
+                  for (const tab of pane.tabs) next = closeTab(next, tab.id, () => newTab(defaultRoute()));
+                  return next;
+                })}
+                onDropTab={(tabId, index) => setLayout((l) => moveTab(l, tabId, pane.id, index))}
+              />
+              <div className="pane-body">
+                {pane.tabs.map((tab) => (
+                  <TabView
+                    key={tab.id}
+                    tab={tab}
+                    visible={tab.id === pane.active}
+                    focused={tab.id === pane.active && paneFocused}
+                    contexts={contexts}
+                    settings={settings}
+                    paused={paused}
+                    save={save}
+                    onNavigate={(patch, opts) => nav(tab.id, patch, opts)}
+                    onBack={() => setLayout((l) => goBack(l, tab.id))}
+                    onForward={() => setLayout((l) => goForward(l, tab.id))}
+                    onOpenTab={(route, detail) => openTab(route, detail, pane.id)}
+                    onOpenWindow={openWindow}
+                    onAddCluster={() => setAdding(true)}
+                    onToast={showToast}
+                    onVisit={visit}
+                    onForwardStarted={(fwd: PortForward) => {
+                      forwards.reload();
+                      setPanel('forwards');
+                      showToast(t('pf.started', { port: fwd.localPort }));
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </main>
-
-      {target && (
-        <DetailDrawer
-          key={`${ctx}/${target.kind.type}/${target.ns}/${target.name}`}
-          ctx={ctx}
-          target={target}
-          refreshMs={refreshMs}
-          onClose={() => setTarget(null)}
-          onNavigate={navigateTo}
-          onAction={(action, tg, obj) => setDialog({ action, target: tg, obj })}
-          onForward={(tg, obj) => setForwardFor({ target: tg, obj })}
-        />
-      )}
 
       {panel === 'commands' && <CommandLog onClose={() => setPanel(null)} />}
       {panel === 'forwards' && <ForwardsPanel forwards={forwards.data ?? []} onChanged={forwards.reload} onClose={() => setPanel(null)} />}
-
-      {dialog && (
-        <ActionDialog
-          ctx={ctx}
-          action={dialog.action}
-          target={dialog.target}
-          obj={dialog.obj}
-          isProtected={isProtected}
-          onClose={() => setDialog(null)}
-          onDone={(message) => {
-            setDialog(null);
-            showToast(message);
-            list.reload();
-            if (dialog.action === 'delete') setTarget(null);
-          }}
-        />
-      )}
-
-      {forwardFor && (
-        <ForwardDialog
-          ctx={ctx}
-          target={forwardFor.target}
-          obj={forwardFor.obj}
-          onClose={() => setForwardFor(null)}
-          onStarted={(fwd: PortForward) => {
-            setForwardFor(null);
-            forwards.reload();
-            setPanel('forwards');
-            showToast(t('pf.started', { port: fwd.localPort }));
-          }}
-        />
-      )}
 
       {adding && <AddClusterDialog existingContexts={names} onClose={() => setAdding(false)} onDone={clusterAdded} />}
       {palette && <CommandPalette items={paletteItems} onClose={() => setPalette(false)} />}
@@ -550,30 +414,5 @@ function Workspace({ initialSettings, contexts: initialContexts, current }: { in
 
       {toast && <div className="toast"><Icon name="check" /> {toast}</div>}
     </div>
-  );
-}
-
-function NamespaceInput({ value, options, onCommit }: { value: string; options: string[]; onCommit: (v: string) => void }) {
-  const [text, setText] = useState(value === ALL ? '' : value);
-  useEffect(() => setText(value === ALL ? '' : value), [value]);
-  const commit = () => {
-    const v = text.trim();
-    if (v && v !== value) onCommit(v);
-  };
-  return (
-    <>
-      <input
-        className="ns-input"
-        list="known-ns"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-        placeholder="namespace"
-        title={t('topbar.nsInputTitle')}
-        spellCheck={false}
-      />
-      <datalist id="known-ns">{options.map((o) => <option key={o} value={o} />)}</datalist>
-    </>
   );
 }

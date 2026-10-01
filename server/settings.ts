@@ -13,6 +13,8 @@ export interface Settings {
   /** Namespaces typed by hand, for contexts where listing namespaces is forbidden. */
   knownNamespaces: Record<string, string[]>;
   contextColors: Record<string, string>;
+  /** Saved tabs/panes of the main window; opaque to the server. */
+  layout?: unknown;
 }
 
 const DEFAULTS: Settings = {
@@ -51,6 +53,7 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
   }
   if (patch.theme === 'dark' || patch.theme === 'light') next.theme = patch.theme;
   if (patch.language === 'en' || patch.language === 'pt-BR') next.language = patch.language;
+  if (patch.layout && typeof patch.layout === 'object' && JSON.stringify(patch.layout).length < 200_000) next.layout = patch.layout;
   if (typeof patch.lastContext === 'string') next.lastContext = patch.lastContext;
   if (isStringRecord(patch.lastNamespace)) next.lastNamespace = { ...current.lastNamespace, ...patch.lastNamespace };
   if (isStringRecord(patch.contextColors)) next.contextColors = { ...current.contextColors, ...patch.contextColors };

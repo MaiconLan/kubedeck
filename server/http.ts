@@ -30,6 +30,7 @@ const MIME: Record<string, string> = {
   '.ico': 'image/x-icon',
   '.json': 'application/json',
   '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
 };
 
 type Query = URLSearchParams;

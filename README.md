@@ -1,6 +1,6 @@
 # KubeDeck
 
-A local, visual Kubernetes dashboard — a k9s alternative that runs in your browser.
+A local, visual Kubernetes dashboard — a k9s alternative with tabs and split panes, as a desktop app or in your browser.
 Under the hood it runs the `kubectl` and `helm` on your machine, so it works with any cluster
 that already works in your terminal (k3d, k3s, AKS with `az login`, EKS, GKE…).
 
@@ -11,9 +11,25 @@ and, for Entra ID clusters, `kubelogin`.
 
 ```bash
 npm install
+```
+
+**Desktop app (recommended):**
+
+```bash
+npm run desktop       # build and open the app
+npm run dist:win      # build a Windows installer and a portable .exe into release/
+```
+
+Launching KubeDeck again opens another window of the same app.
+
+**Browser mode** (the `kubedeck` command):
+
+```bash
 npm run build
 npm link          # makes the "kubedeck" command available in any terminal
 ```
+
+After code changes, run `npm run build` again and restart `kubedeck`.
 
 ### Troubleshooting: "kubedeck is not recognized as the name of a cmdlet…" (Windows)
 
@@ -65,22 +81,26 @@ Nothing is stored except preferences in `~/.kubedeck/settings.json`.
 | `:` or `Ctrl+K` | Go to a resource, context or namespace (`po`, `deploy`, `hr`, `ks`, `ctx name`, `ns name`) |
 | `/` | Filter the table (several words, labels such as `app=api`) |
 | `Esc` | Close the panel |
-| `g` then `d` / `m` / `p` / `y` / `s` … | Go to dashboard / map / pods / deployments / services … |
+| `g` then `d` / `p` / `y` / `s` … | Go to dashboard / pods / deployments / services … |
 | `g` then `f` / `l` | Port-forwards / executed commands panel |
 | `?` | All shortcuts |
+| `Ctrl+T` / `Ctrl+W` / `Ctrl+Tab` | New / close / next tab (desktop app; `g t` / `g w` in the browser) |
+| `Ctrl+\` / `Ctrl+N` | Split right / open the tab in a new window (desktop app) |
 
 ### Features
 
 - **Dashboard** (home screen): node and pod health, cluster CPU/memory usage against allocatable capacity and
   requests, per-node usage, top pods by CPU and memory, a "needs attention" list and recent warnings.
   Usage numbers need `metrics-server` (bundled with k3s and AKS); without it the dashboard shows requests only.
-- **Relationship map**: Ingress/IngressRoute → Service → Deployment/StatefulSet/DaemonSet/Job → Pods →
-  ConfigMaps/Secrets/PVCs, one band per app. Hover a card to highlight its chain, click to open it.
 - **Port-forward** from pods, services, deployments and statefulsets, with a panel to open, copy or stop
   active forwards. Forwards stop when KubeDeck exits.
 - **Navigation**: browser back/forward and bookmarkable URLs, related resources in the detail panel
   (a deployment's pods, a pod's node, ConfigMaps/Secrets/PVCs it uses…), recent items in quick navigation,
   and `g` + key shortcuts (press `?` for the list).
+- **Tabs and split panes**: each tab has its own context, namespace, screen, filter and back/forward history.
+  Ctrl+click or middle-click a row (or use the button in the detail panel) to open a resource in its own tab,
+  where its logs keep streaming in the background. Split the window into up to 3 panes, drag tabs between
+  them, or open a tab in a new window. Open tabs are restored on the next start.
 - kubeconfig contexts (without touching your `current-context`) and namespaces.
 - Workloads, network (including Traefik IngressRoutes), config, storage, Flux, Helm releases and any CRD.
 - Detail panel: overview, live logs (a pod or a whole deployment), describe, YAML, events, decoded secrets.
@@ -115,7 +135,15 @@ npm run dev:server   # API on 127.0.0.1:7420 (token "dev")
 npm run dev:web      # Vite on http://localhost:5173/?t=dev
 ```
 
-Layout: `server/` (dependency-free Node, runs kubectl/helm/az) and `web/` (React + Vite).
+Open `http://localhost:5173/?t=dev` in a browser, or run `npm run dev:desktop` in a third terminal to get the
+desktop window on top of the same dev servers.
+
+Layout: `server/` (dependency-free Node, runs kubectl/helm/az), `web/` (React + Vite) and `desktop/`
+(Electron shell that starts the same server in-process and opens app windows).
+
+Unreleased features are switched off in `FEATURES` (`web/src/catalog.ts`); the relationship map is currently off.
+Fonts (Geist / Geist Mono) are bundled from `@fontsource`, so the app works offline. The app icon is
+`build/icon.png`; electron-builder generates the Windows `.ico` from it.
 
 ### Translations
 

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { isDesktop } from '../api';
 import { KIND_BY_TYPE, kindLabel } from '../catalog';
 import { t } from '../i18n';
 import { GO_KEYS } from '../route';
@@ -20,6 +21,20 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
     ['g f', t('keys.forwards')],
     ['g l', t('keys.commands')],
   ];
+  const tabs: Array<[string, string]> = [
+    [isDesktop ? 'Ctrl+T' : 'g t', t('tabs.new')],
+    [isDesktop ? 'Ctrl+W' : 'g w', t('tabs.close')],
+    ...(isDesktop
+      ? ([
+          ['Ctrl+Tab', t('keys.nextTab')],
+          ['Ctrl+1…9', t('keys.tabN')],
+          ['Ctrl+\\', t('tabs.split')],
+          ['Ctrl+N', t('tabs.openInWindow')],
+        ] as Array<[string, string]>)
+      : []),
+    [t('keys.ctrlClick'), t('tabs.openInTab')],
+    [t('keys.middleClick'), t('keys.middleClickAction')],
+  ];
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -32,6 +47,8 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
           <div>
             <h4>{t('keys.general')}</h4>
             {general.map(([k, label]) => <Row key={k} keys={k} label={label} />)}
+            <h4>{t('keys.tabs')}</h4>
+            {tabs.map(([k, label]) => <Row key={k} keys={k} label={label} />)}
           </div>
           <div>
             <h4>{t('keys.goTo')}</h4>
@@ -49,7 +66,7 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
 function Row({ keys, label }: { keys: string; label: string }) {
   return (
     <div className="key-row">
-      <span className="key-combo">{keys.split(' ').map((k, i) => <kbd key={i}>{k}</kbd>)}</span>
+      <span className="key-combo">{/^[a-z?:/]( [a-z])?$/i.test(keys) || keys.startsWith('g ') ? keys.split(' ').map((k, i) => <kbd key={i}>{k}</kbd>) : <kbd>{keys}</kbd>}</span>
       <span>{label}</span>
     </div>
   );

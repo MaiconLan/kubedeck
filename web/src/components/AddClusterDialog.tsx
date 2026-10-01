@@ -204,8 +204,8 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
 
               {preview.length > 0 && (
                 <div className="field">
-                  <span>{t('aks.commands')}</span>
-                  <pre className="cmd">{preview.join('\n')}</pre>
+                  <span className="mono-label">{t('aks.commands')}</span>
+                  <pre className="cmd">{preview.map((c) => <span key={c}><span className="prompt">$ </span>{c}{'\n'}</span>)}</pre>
                   <span className="muted small">{t('aks.currentContextNote')}</span>
                 </div>
               )}

@@ -9,7 +9,8 @@ interface Props {
   filter: string;
   showNamespace: boolean;
   selectedKey?: string;
-  onOpen: (item: any) => void;
+  /** `newTab`: Ctrl/Cmd+click or middle click. */
+  onOpen: (item: any, newTab: boolean) => void;
 }
 
 export function rowKey(item: any): string {
@@ -71,7 +72,13 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
           {rows.map((item) => {
             const key = rowKey(item);
             return (
-              <tr key={key} className={key === selectedKey ? 'selected' : ''} onClick={() => onOpen(item)}>
+              <tr
+                key={key}
+                className={key === selectedKey ? 'selected' : ''}
+                onClick={(e) => onOpen(item, e.ctrlKey || e.metaKey)}
+                onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+                onAuxClick={(e) => e.button === 1 && onOpen(item, true)}
+              >
                 {columns.map((c) => <td key={c.key} className={cls(c)}>{renderCell(c.get(item))}</td>)}
               </tr>
             );
@@ -89,6 +96,7 @@ function cls(c: Column): string {
 
 function renderCell(c: Cell) {
   if (typeof c !== 'object') return c;
+  if (c.tone && c.plain) return <span className={`mono tone-${c.tone}`} title={c.title}>{c.text}</span>;
   if (c.tone) return <Badge tone={c.tone} title={c.title}>{c.text}</Badge>;
   return <span title={c.title}>{c.text}</span>;
 }

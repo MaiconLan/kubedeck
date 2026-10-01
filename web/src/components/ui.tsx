@@ -75,7 +75,7 @@ export function CopyButton({ text, label = t('common.copy'), className = '' }: {
       title={label}
     >
       <Icon name={done ? 'check' : 'copy'} />
-      {label && <span>{done ? t('common.copied') : label}</span>}
+      {label && <span className="label">{done ? t('common.copied') : label}</span>}
     </button>
   );
 }
@@ -109,6 +109,9 @@ const PATHS: Record<string, string> = {
   cube: 'M12 2 3 7v10l9 5 9-5V7zM3 7l9 5 9-5M12 12v10',
   arrowDown: 'M12 5v14m-6-6 6 6 6-6',
   plus: 'M12 5v14M5 12h14',
+  tabNew: 'M3 7h18v13H3zM3 7l2-3h6l2 3M12 11v6m-3-3h6',
+  window: 'M3 4h18v16H3zM3 9h18M14 13h4v4',
+  split: 'M3 4h18v16H3zM12 4v16',
   plug: 'M9 2v6m6-6v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4',
   home: 'M3 11 12 3l9 8v10h-6v-6H9v6H3z',
   map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14m6-12v14',
@@ -117,6 +120,25 @@ const PATHS: Record<string, string> = {
   forward: 'M9 18l6-6-6-6',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
 };
+
+const SPOKES: Array<[number, number, number, number]> = [
+  [12, 5.8, 12, 1.8], [16.847, 8.134, 19.975, 5.64], [18.045, 13.38, 21.944, 14.27], [14.69, 17.586, 16.426, 21.19],
+  [9.31, 17.586, 7.574, 21.19], [5.955, 13.38, 2.056, 14.27], [7.153, 8.134, 4.025, 5.64],
+];
+
+export function BrandMark({ size = 30 }: { size?: number }) {
+  return (
+    <svg className="brand-mark" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="24" height="24" rx="6" fill="#9b8cff" />
+      <circle cx="12" cy="12" r="6.2" fill="none" stroke="#120d2b" strokeWidth="1.6" />
+      {SPOKES.map(([x1, y1, x2, y2]) => (
+        <line key={`${x1}-${y1}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#120d2b" strokeWidth="1.6" strokeLinecap="round" />
+      ))}
+      <rect x="8.6" y="8.4" width="6.8" height="7.2" rx="1.4" fill="#120d2b" />
+      <path d="M10.6 10v4M10.6 12l2.2-2M11.3 11.4l1.6 2.6" stroke="#9b8cff" strokeWidth="1.1" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
 
 export function Icon({ name, size = 16 }: { name: string; size?: number }) {
   return (
