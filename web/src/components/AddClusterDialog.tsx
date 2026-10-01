@@ -135,7 +135,7 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
                     list="az-subs"
                     value={subscription}
                     onChange={(e) => { setSubscription(e.target.value); setClusters(null); }}
-                    placeholder="su-wp-test-13"
+                    placeholder="my-subscription"
                     spellCheck={false}
                     autoFocus
                   />
@@ -170,11 +170,11 @@ export function AddClusterDialog({ existingContexts, onClose, onDone }: Props) {
               <div className="grid-2">
                 <label className="field">
                   <span>{t('aks.resourceGroup')}</span>
-                  <input value={resourceGroup} onChange={(e) => setResourceGroup(e.target.value)} placeholder="rg-wp-test-13" spellCheck={false} />
+                  <input value={resourceGroup} onChange={(e) => setResourceGroup(e.target.value)} placeholder="my-resource-group" spellCheck={false} />
                 </label>
                 <label className="field">
                   <span>{t('aks.clusterName')}</span>
-                  <input value={cluster} onChange={(e) => setCluster(e.target.value)} placeholder="aks-wp-test-13" spellCheck={false} />
+                  <input value={cluster} onChange={(e) => setCluster(e.target.value)} placeholder="my-aks-cluster" spellCheck={false} />
                 </label>
                 <label className="field">
                   <span>{t('aks.contextName')} {optional}</span>
