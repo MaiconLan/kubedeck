@@ -26,7 +26,7 @@ export const en = {
   'topbar.context': 'Context',
   'topbar.namespace': 'Namespace',
   'topbar.protectedOn': 'Protected context: actions require typing the name. Click to unprotect.',
-  'topbar.protectedOff': 'Protect this context (recommended for production/work clusters)',
+  'topbar.protectedOff': 'Protect this context (recommended for shared or production clusters)',
   'topbar.addCluster': 'Add an AKS cluster to the kubeconfig',
   'topbar.allNamespaces': 'all',
   'topbar.filter': 'Filter {kind}  ( / )',

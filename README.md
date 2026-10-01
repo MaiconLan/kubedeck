@@ -33,7 +33,7 @@ Add the folder to your user `PATH` (no admin rights needed):
 
 Then **close every terminal and open a new one** (including VS Code terminals). Open terminals keep the old `PATH`.
 
-If a managed/company laptop resets your `PATH` at login, add it in your PowerShell profile instead
+If your `PATH` gets reset at login (some environments enforce it), add it in your PowerShell profile instead
 (create the profile first with `New-Item -ItemType File -Force $PROFILE` if it doesn't exist):
 
 ```powershell
@@ -75,7 +75,7 @@ Nothing is stored except preferences in `~/.kubedeck/settings.json`.
 - Every action shows the exact command before running; the terminal icon lists everything that was run.
 - UI in English or Portuguese (language picker in the top bar).
 
-### Work cluster (AKS)
+### AKS clusters
 
 1. `az login` in a terminal.
 2. If the cluster is not in your kubeconfig yet, click **+** next to the context picker (or `:` → "Add AKS cluster").

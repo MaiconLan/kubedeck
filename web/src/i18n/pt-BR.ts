@@ -27,7 +27,7 @@ export const ptBR: Messages = {
   'topbar.context': 'Contexto',
   'topbar.namespace': 'Namespace',
   'topbar.protectedOn': 'Contexto protegido: ações pedem digitar o nome. Clique para desproteger.',
-  'topbar.protectedOff': 'Proteger este contexto (recomendado para produção/trabalho)',
+  'topbar.protectedOff': 'Proteger este contexto (recomendado para clusters compartilhados ou de produção)',
   'topbar.addCluster': 'Adicionar cluster AKS ao kubeconfig',
   'topbar.allNamespaces': 'todos',
   'topbar.filter': 'Filtrar {kind}  ( / )',
