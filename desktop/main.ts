@@ -8,6 +8,8 @@ import { stopAllForwards } from '../server/portforward.js';
 // `electron . --dev` attaches to `npm run dev:server` + `npm run dev:web` (hot reload).
 const DEV_URL = 'http://localhost:5173/?t=dev';
 const dev = process.argv.includes('--dev');
+// `electron . --demo` runs against the built-in fake cluster (see server/demo.ts).
+if (process.argv.includes('--demo')) process.env.KUBEDECK_DEMO = '1';
 
 let baseUrl = '';
 

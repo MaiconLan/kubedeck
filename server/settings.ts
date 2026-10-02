@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { demoEnabled } from './demo.js';
 
 export interface Settings {
   protectedContexts: string[];
@@ -31,8 +32,21 @@ const FILE = join(DIR, 'settings.json');
 
 let cache: Settings | null = null;
 
+// Demo mode keeps settings in memory, starting from a fixed state, and never touches ~/.kubedeck.
+const DEMO_SETTINGS: Settings = {
+  ...DEFAULTS,
+  protectedContexts: ['prod-eu'],
+  language: 'en',
+  lastContext: 'local-dev',
+  lastNamespace: { 'local-dev': '*', staging: 'apps', 'prod-eu': 'apps' },
+};
+
 export async function loadSettings(): Promise<Settings> {
   if (cache) return cache;
+  if (demoEnabled()) {
+    cache = structuredClone(DEMO_SETTINGS);
+    return cache;
+  }
   try {
     const raw = JSON.parse(await readFile(FILE, 'utf8'));
     cache = { ...DEFAULTS, ...raw };
@@ -64,6 +78,7 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
     }
   }
   cache = next;
+  if (demoEnabled()) return next;
   await mkdir(DIR, { recursive: true });
   await writeFile(FILE, JSON.stringify(next, null, 2), 'utf8');
   return next;

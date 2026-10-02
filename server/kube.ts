@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { demoEnabled, demoRun, demoSpawn } from './demo.js';
 import { AppError, classifyStderr, invalid } from './errors.js';
 
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -60,6 +61,18 @@ function spawnBin(bin: Bin, args: string[]): ChildProcess {
 export function run(bin: Bin, args: string[], opts: RunOptions = {}): Promise<string> {
   const command = formatCommand(bin, args);
   const started = Date.now();
+  if (demoEnabled()) {
+    return demoRun(bin, args, command).then(
+      (out) => {
+        record(command, !!opts.write, true, started);
+        return out;
+      },
+      (e) => {
+        record(command, !!opts.write, false, started);
+        throw e;
+      },
+    );
+  }
   return new Promise((resolve, reject) => {
     let child: ChildProcess;
     try {
@@ -139,7 +152,7 @@ export function spawnKubectl(ctx: string, args: string[]): { child: ChildProcess
   const full = ['--context', ctx, ...args];
   const command = formatCommand('kubectl', full);
   record(command, false, true, Date.now());
-  const child = spawn('kubectl', full, { windowsHide: true, env: process.env });
+  const child = demoEnabled() ? demoSpawn(full) : spawn('kubectl', full, { windowsHide: true, env: process.env });
   return { child, command };
 }
 

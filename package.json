@@ -1,7 +1,7 @@
 {
   "name": "kubedeck",
   "version": "0.1.0",
-  "description": "Local, visual Kubernetes dashboard that drives kubectl and helm.",
+  "description": "A fast, good-looking Kubernetes desktop app: tabs, split panes, live logs, diagnosis of failing pods, Flux and Helm, port-forward. Runs your own kubectl; nothing leaves your machine.",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -24,7 +24,11 @@
     "dev:server": "tsx watch server/cli.ts --dev",
     "dev:web": "vite",
     "dev:desktop": "npm run build:node && electron . --dev",
-    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p web/tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p web/tsconfig.json --noEmit",
+    "demo": "npm run build && node bin/kubedeck.js --demo",
+    "desktop:demo": "npm run build && electron . --demo",
+    "dev:demo": "tsx watch server/cli.ts --dev --demo",
+    "media": "npm run build && node scripts/record-media.mjs"
   },
   "dependencies": {},
   "devDependencies": {
@@ -36,13 +40,16 @@
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "gifenc": "^1.0.3",
+    "playwright": "^1.48.2",
+    "pngjs": "^7.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"
   },
-  "author": "KubeDeck",
+  "author": "KubeDeck contributors",
   "main": "dist/desktop/main.js",
   "build": {
     "appId": "dev.kubedeck.app",
@@ -66,6 +73,44 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
-  }
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "maintainer": "KubeDeck contributors"
+    },
+    "artifactName": "KubeDeck-${version}-${os}-${arch}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "releaseType": "draft"
+      }
+    ]
+  },
+  "keywords": [
+    "kubernetes",
+    "k8s",
+    "kubectl",
+    "dashboard",
+    "desktop",
+    "electron",
+    "k9s",
+    "flux",
+    "helm",
+    "aks",
+    "devops",
+    "gitops"
+  ]
 }

@@ -14,15 +14,17 @@ const option = (name: string) => {
 if (flag('--help') || flag('-h')) {
   console.log(`kubedeck — local Kubernetes dashboard
 
-Usage: kubedeck [--port 7420] [--no-open]
+Usage: kubedeck [--port 7420] [--no-open] [--demo]
 
   --port <n>   fixed port (default: any free port)
   --no-open    do not open the browser automatically
+  --demo       explore a built-in fake cluster (no kubectl or cluster needed)
 `);
   process.exit(0);
 }
 
 const dev = flag('--dev');
+if (flag('--demo')) process.env.KUBEDECK_DEMO = '1';
 const port = Number(option('--port') ?? (dev ? 7420 : 0));
 const token = dev ? 'dev' : randomBytes(24).toString('hex');
 

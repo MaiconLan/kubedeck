@@ -1,0 +1,37 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Error details
+      description: If an error banner appeared, click "Details" and paste it here. Remove anything sensitive.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: KubeDeck version
+      placeholder: 0.1.0
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How do you run it?
+      options: [Desktop app, Browser mode (kubedeck command), Demo mode]
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11, macOS 15, Ubuntu 24.04…
+  - type: input
+    id: cluster
+    attributes:
+      label: Cluster type and kubectl version
+      placeholder: k3s 1.30, AKS 1.29 with kubelogin, kubectl 1.30…
