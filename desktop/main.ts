@@ -54,7 +54,9 @@ function guard(win: BrowserWindow) {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
-  win.webContents.on('will-navigate', (event: { preventDefault(): void }, url: string) => {
+  // Newer Electron versions put the URL on the event; the second argument is the older form.
+  win.webContents.on('will-navigate', (event: { preventDefault(): void; url?: string }, legacyUrl?: string) => {
+    const url = event.url ?? legacyUrl ?? '';
     if (isOwnUrl(url)) return;
     event.preventDefault();
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
