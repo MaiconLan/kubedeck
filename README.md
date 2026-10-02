@@ -54,7 +54,7 @@
 No cluster needed: the demo mode ships with a realistic fake cluster (fictional data).
 
 ```bash
-git clone https://github.com/<you>/kubedeck.git
+git clone https://github.com/maiconlan/kubedeck.git
 cd kubedeck
 npm install
 npm run desktop:demo     # desktop app

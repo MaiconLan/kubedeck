@@ -287,7 +287,8 @@ function addWorkload(w: World, s: WorkloadSpec) {
   };
   w.objects.push(obj);
 
-  let owner = { kind: s.kind, name: s.name, uid: objMeta.uid };
+  // Pods are owned by the workload itself, or by its ReplicaSet for Deployments.
+  let owner: { kind: string; name: string; uid: string } = { kind: s.kind, name: s.name, uid: objMeta.uid };
   let rsHash = '';
   if (s.kind === 'Deployment') {
     // Fixed hash for "api" so the README script can refer to its pods by name.

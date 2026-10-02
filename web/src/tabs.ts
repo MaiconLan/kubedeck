@@ -214,13 +214,13 @@ export function restore(raw: unknown, contexts: string[]): Layout | null {
   try {
     const data = raw as { focused: string; panes: Array<{ id: string; active: string; tabs: Array<{ id: string; route: Route; detail: boolean }> }> };
     const panes: Pane[] = data.panes
-      .map((p) => {
-        const tabs = p.tabs
+      .map((p): Pane => {
+        const tabs: Tab[] = p.tabs
           .filter((t) => t.route && contexts.includes(t.route.ctx) && typeof t.route.type === 'string')
           .map((t) => ({ id: t.id, route: t.route, detail: !!t.detail && !!t.route.target, back: [], forward: [] }));
-        return { id: p.id, tabs, active: tabs.some((t) => t.id === p.active) ? p.active : tabs[0]?.id };
+        return { id: p.id, tabs, active: tabs.some((t) => t.id === p.active) ? p.active : tabs[0]?.id ?? '' };
       })
-      .filter((p): p is Pane => p.tabs.length > 0)
+      .filter((p) => p.tabs.length > 0)
       .slice(0, MAX_PANES);
     if (!panes.length) return null;
     return { panes, focused: panes.some((p) => p.id === data.focused) ? data.focused : panes[0].id };
