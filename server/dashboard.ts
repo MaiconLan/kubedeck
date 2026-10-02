@@ -35,7 +35,7 @@ function resources(containers: any[] | undefined) {
 
 /** Pod with only what the dashboard needs; the UI derives status from it. */
 function slimPod(p: any) {
-  const strip = (s: any) => ({ name: s.name, ready: s.ready, restartCount: s.restartCount, state: s.state });
+  const strip = (s: any) => ({ name: s.name, ready: s.ready, restartCount: s.restartCount, state: s.state, lastState: s.lastState });
   return {
     metadata: {
       name: p.metadata?.name,
@@ -47,11 +47,13 @@ function slimPod(p: any) {
     },
     spec: {
       nodeName: p.spec?.nodeName,
-      containers: (p.spec?.containers ?? []).map((c: any) => ({ name: c.name })),
+      containers: (p.spec?.containers ?? []).map((c: any) => ({ name: c.name, image: c.image, resources: c.resources })),
     },
     status: {
       phase: p.status?.phase,
       reason: p.status?.reason,
+      message: p.status?.message,
+      conditions: p.status?.conditions,
       containerStatuses: (p.status?.containerStatuses ?? []).map(strip),
       initContainerStatuses: (p.status?.initContainerStatuses ?? []).map(strip),
     },

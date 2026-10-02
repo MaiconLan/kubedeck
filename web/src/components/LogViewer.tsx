@@ -12,14 +12,16 @@ interface Props {
   type: string;
   name: string;
   containers: string[];
+  initialPrevious?: boolean;
+  initialContainer?: string;
 }
 
-export function LogViewer({ ctx, ns, type, name, containers }: Props) {
+export function LogViewer({ ctx, ns, type, name, containers, initialPrevious = false, initialContainer }: Props) {
   const isPod = type === 'pods';
-  const [container, setContainer] = useState(isPod ? containers[0] ?? '' : '');
+  const [container, setContainer] = useState(initialContainer ?? (isPod ? containers[0] ?? '' : ''));
   const [tail, setTail] = useState(500);
   const [follow, setFollow] = useState(true);
-  const [previous, setPrevious] = useState(false);
+  const [previous, setPrevious] = useState(initialPrevious);
   const [timestamps, setTimestamps] = useState(false);
   const [wrap, setWrap] = useState(true);
   const [query, setQuery] = useState('');

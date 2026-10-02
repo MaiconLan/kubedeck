@@ -92,6 +92,11 @@ Nothing is stored except preferences in `~/.kubedeck/settings.json`.
 - **Dashboard** (home screen): node and pod health, cluster CPU/memory usage against allocatable capacity and
   requests, per-node usage, top pods by CPU and memory, a "needs attention" list and recent warnings.
   Usage numbers need `metrics-server` (bundled with k3s and AKS); without it the dashboard shows requests only.
+- **Diagnosis** ("why isn't this pod running?"): for unhealthy pods, Deployments, StatefulSets, DaemonSets,
+  ReplicaSets and Jobs, the Overview tab explains the likely cause (out of memory, image not found or not allowed,
+  missing Secret/ConfigMap/key, no node with free resources, taints, failing probes, volume or PVC problems,
+  namespace quota, admission webhooks, stuck rollouts, failed jobs…), shows the evidence it is based on and what
+  to do. It is rule-based: no AI, nothing leaves your machine. The dashboard shows the short version.
 - **Port-forward** from pods, services, deployments and statefulsets, with a panel to open, copy or stop
   active forwards. Forwards stop when KubeDeck exits.
 - **Navigation**: browser back/forward and bookmarkable URLs, related resources in the detail panel

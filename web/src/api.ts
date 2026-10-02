@@ -103,6 +103,8 @@ export const api = {
   list: (ctx: string, type: string, ns: string, filter: { labels?: string; fields?: string } = {}) =>
     request<{ namespaced: boolean; items: any[] }>('GET', '/api/list', { ctx, type, ns, ...filter }),
   dashboard: (ctx: string, ns: string) => request<DashboardData>('GET', '/api/dashboard', { ctx, ns }),
+  /** Facts for the rule-based diagnosis (see diagnosis.ts). */
+  diagnose: (ctx: string, type: string, name: string, ns: string) => request<unknown>('GET', '/api/diagnose', { ctx, type, name, ns }),
   forwards: () => request<PortForward[]>('GET', '/api/forwards'),
   startForward: (body: { ctx: string; ns: string; type: string; name: string; remotePort: number; localPort?: number }) =>
     request<PortForward>('POST', '/api/forwards', {}, body),

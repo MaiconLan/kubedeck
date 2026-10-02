@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { HELM_TYPE, type ActionName, type Kind } from '../catalog';
 import { age } from '../format';
+import type { DiagAction } from '../diagnosis';
 import { useAsync } from '../hooks';
 import { getLanguage, t, type MessageKey } from '../i18n';
 import { CodeBlock } from './CodeBlock';
@@ -91,7 +92,18 @@ function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction, onForwar
     ['events', 'tab.events'],
   ];
   const [tab, setTab] = useState<Tab>('overview');
+  // Options the Logs tab opens with (the diagnosis can ask for the previous run of a container).
+  const [logStart, setLogStart] = useState<{ previous: boolean; container?: string; n: number }>({ previous: false, n: 0 });
   useEffect(() => setTab('overview'), [ctx, kind.type, name, ns]);
+
+  const onDiagnosisAction = (action: DiagAction, container?: string) => {
+    if (action === 'previousLogs' || action === 'logs') {
+      setLogStart((s) => ({ previous: action === 'previousLogs', container, n: s.n + 1 }));
+      setTab('logs');
+    } else {
+      setTab(action);
+    }
+  };
 
   const data = obj.data;
   const suspended = data?.spec?.suspend === true;
@@ -127,10 +139,14 @@ function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction, onForwar
         {tab === 'overview' && (
           obj.error ? <ErrorBanner error={obj.error} onRetry={obj.reload} />
             : !data ? <Spinner />
-              : <Overview ctx={ctx} obj={data} onNavigate={onNavigate} />
+              : <Overview ctx={ctx} obj={data} onNavigate={onNavigate} onDiagnosisAction={onDiagnosisAction} />
         )}
         {tab === 'logs' && data && (
-          <LogViewer ctx={ctx} ns={ns ?? ''} type={kind.type} name={name} containers={containersOf(data)} />
+          <LogViewer
+            key={logStart.n}
+            ctx={ctx} ns={ns ?? ''} type={kind.type} name={name} containers={containersOf(data)}
+            initialPrevious={logStart.previous} initialContainer={logStart.container}
+          />
         )}
         {tab === 'secret' && <SecretView ctx={ctx} ns={ns ?? ''} name={name} />}
         {tab === 'describe' && <TextTab load={() => api.describe(ctx, kind.type, name, ns)} deps={[ctx, kind.type, name, ns]} />}

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { api, errorMessage, type ApiError, type DashboardData, type Part } from '../api';
 import { age, bytes, condition, cores, percent, podStatus, readyState, restarts, ts, type Tone } from '../format';
+import { quickPodHint, quickWorkloadHint } from '../diagnosis';
 import { useAsync } from '../hooks';
 import { t } from '../i18n';
 import { Badge, Empty, ErrorBanner, Icon, Spinner } from './ui';
@@ -380,9 +381,9 @@ function findProblems(pods: any[], workloads: any[], flux: any[]): Problem[] {
     const old = Date.now() - ts(p.metadata?.creationTimestamp) > STALE_MS;
     const r = restarts(p);
     if (s.tone === 'err' || (s.tone === 'warn' && old)) {
-      out.push({ tone: s.tone, kind: 'Pod', name: p.metadata.name, ns: p.metadata.namespace, reason: s.text, detail: waitingMessage(p) });
+      out.push({ tone: s.tone, kind: 'Pod', name: p.metadata.name, ns: p.metadata.namespace, reason: s.text, detail: quickPodHint(p) ?? waitingMessage(p) });
     } else if (r >= 5 && s.tone !== 'muted') {
-      out.push({ tone: 'warn', kind: 'Pod', name: p.metadata.name, ns: p.metadata.namespace, reason: t('dash.restarts', { n: r }), detail: '' });
+      out.push({ tone: 'warn', kind: 'Pod', name: p.metadata.name, ns: p.metadata.namespace, reason: t('dash.restarts', { n: r }), detail: quickPodHint(p) ?? '' });
     }
   }
   for (const w of workloads) {
@@ -390,7 +391,7 @@ function findProblems(pods: any[], workloads: any[], flux: any[]): Problem[] {
     if (tone === 'ok') continue;
     const ready = w.kind === 'DaemonSet' ? w.status?.numberReady ?? 0 : w.status?.readyReplicas ?? 0;
     const want = w.kind === 'DaemonSet' ? w.status?.desiredNumberScheduled ?? 0 : w.spec?.replicas ?? 0;
-    out.push({ tone, kind: w.kind, name: w.metadata.name, ns: w.metadata.namespace, reason: t('dash.readyOf', { ready, want }), detail: '' });
+    out.push({ tone, kind: w.kind, name: w.metadata.name, ns: w.metadata.namespace, reason: t('dash.readyOf', { ready, want }), detail: quickWorkloadHint(w) ?? '' });
   }
   for (const f of flux) {
     const r = readyState(f);

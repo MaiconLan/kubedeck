@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { kindByName } from '../catalog';
 import { age, dateTime, podStatus, readyState, type Tone } from '../format';
+import type { DiagAction } from '../diagnosis';
 import { t } from '../i18n';
+import { DiagnosisPanel } from './DiagnosisPanel';
 import { Related } from './Related';
 import { Badge } from './ui';
 
@@ -9,15 +11,17 @@ interface Props {
   ctx: string;
   obj: any;
   onNavigate: (kindName: string, name: string, ns?: string) => void;
+  onDiagnosisAction: (action: DiagAction, container?: string) => void;
 }
 
-export function Overview({ ctx, obj, onNavigate }: Props) {
+export function Overview({ ctx, obj, onNavigate, onDiagnosisAction }: Props) {
   const md = obj.metadata ?? {};
   const ready = readyState(obj);
   const conditions: any[] = obj.status?.conditions ?? [];
 
   return (
     <div className="overview">
+      <DiagnosisPanel ctx={ctx} obj={obj} onAction={onDiagnosisAction} onNavigate={onNavigate} />
       <section className="facts">
         <Fact label={t('ov.kind')}>{obj.kind}</Fact>
         {md.namespace && <Fact label="Namespace">{md.namespace}</Fact>}

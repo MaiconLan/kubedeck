@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { runAction, ALLOWED, type ActionRequest } from './actions.js';
 import { addAksCluster, listAksClusters, listSubscriptions, type AddAksRequest } from './azure.js';
 import { dashboard } from './dashboard.js';
+import { diagnose } from './diagnose.js';
 import { AppError, invalid } from './errors.js';
 import { listReleases, releaseDetail, type HelmView } from './helm.js';
 import { commandHistory } from './kube.js';
@@ -54,6 +55,7 @@ export function createApp(token: string) {
         fields: q.get('fields') || undefined,
       }),
     'GET /api/dashboard': async (q) => dashboard(await ctxOf(q), q.get('ns') ?? undefined),
+    'GET /api/diagnose': async (q) => diagnose(await ctxOf(q), q.get('type') ?? '', q.get('name') ?? '', q.get('ns') ?? ''),
 
     'GET /api/forwards': async () => listForwards(),
     'POST /api/forwards': async (_q, req) => {
