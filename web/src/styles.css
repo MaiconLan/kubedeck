@@ -107,6 +107,13 @@ input, select {
 }
 input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 select { cursor: pointer; padding-right: 26px; }
+/* The open list of a <select> is drawn by the OS. Selects with a transparent background
+   (pickers, sidebar footer) leave it to the OS default (white), so give options explicit
+   theme colors; this works for both the dark and the light theme. */
+select { color-scheme: inherit; }
+select option, select optgroup { background-color: var(--bg-elev); color: var(--text); }
+select option:checked { background-color: var(--selected); color: var(--text); }
+select option:disabled { color: var(--text-3); }
 ::selection { background: var(--accent-soft); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
