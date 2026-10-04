@@ -66,6 +66,7 @@ interface RecentItem {
 }
 
 const MAX_RECENT = 8;
+const DISCOVERY_REFRESH_MS = 60_000;
 
 /** Windows opened from another window start from a single tab and don't overwrite the saved layout. */
 const fromHash = routeFromHash(window.location.hash);
@@ -144,7 +145,8 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
 
   // ---- shared data for the sidebar and quick navigation (focused tab's context)
   const namespaces = useAsync(() => api.namespaces(ctx), [ctx]);
-  const discovery = useAsync(() => api.discovery(ctx), [ctx]);
+  // Re-checked periodically so a list that failed while the cluster was down recovers.
+  const discovery = useAsync(() => api.discovery(ctx), [ctx], DISCOVERY_REFRESH_MS);
   const available = useMemo(() => {
     if (!discovery.data) return null;
     return new Set([...discovery.data.map((r) => r.type), ...BUILTIN_TYPES]);
