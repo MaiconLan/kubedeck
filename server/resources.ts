@@ -72,8 +72,10 @@ export async function discover(ctx: string, fresh = false): Promise<ApiResource[
   if (hit && !fresh && Date.now() - hit.at < 5 * 60_000) return hit.list;
 
   // api-resources exits non-zero when one aggregated API (often metrics) is down,
-  // while still printing everything else, so partial output is accepted.
-  const text = await kubectl(ctx, ['api-resources', '-o', 'wide'], { allowPartial: true, timeoutMs: 30_000 });
+  // while still printing everything else, so partial output is accepted. When the
+  // cluster is unreachable it prints only the header: that must fail, or an empty
+  // list gets cached and every screen looks unavailable.
+  const text = await kubectl(ctx, ['api-resources', '-o', 'wide'], { allowPartial: (out) => /^pods\s/m.test(out), timeoutMs: 30_000 });
   const list = parseApiResources(text);
   discoveryCache.set(ctx, { at: Date.now(), list });
   return list;

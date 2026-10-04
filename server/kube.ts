@@ -36,8 +36,11 @@ export function formatCommand(bin: string, args: string[]): string {
 export interface RunOptions {
   timeoutMs?: number;
   write?: boolean;
-  /** Accept stdout even when the exit code is non-zero (e.g. partial api-resources). */
-  allowPartial?: boolean;
+  /**
+   * Accept stdout even when the exit code is non-zero (e.g. partial api-resources),
+   * as long as this says the output is usable.
+   */
+  allowPartial?: (stdout: string) => boolean;
 }
 
 export type Bin = 'kubectl' | 'helm' | 'az' | 'kubelogin';
@@ -113,7 +116,7 @@ export function run(bin: Bin, args: string[], opts: RunOptions = {}): Promise<st
       clearTimeout(timer);
       const stdout = Buffer.concat(out).toString('utf8');
       const stderr = Buffer.concat(err).toString('utf8');
-      const ok = code === 0 || (!!opts.allowPartial && stdout.trim().length > 0);
+      const ok = code === 0 || (!!opts.allowPartial && opts.allowPartial(stdout));
       record(command, !!opts.write, ok && !timedOut, started);
       if (timedOut) {
         reject(new AppError('timeout', 'timeout', 'The cluster took too long to respond.', { detail: stderr, command }));

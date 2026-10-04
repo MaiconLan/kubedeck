@@ -63,7 +63,8 @@ export function TabView(props: Props) {
 
   // ---- data
   const namespaces = useAsync(() => api.namespaces(ctx), [ctx]);
-  const discovery = useAsync(() => api.discovery(ctx), [ctx]);
+  // Re-checked periodically (api.discovery is cached), so it recovers after the cluster was unreachable.
+  const discovery = useAsync(() => api.discovery(ctx), [ctx], visible ? 60_000 : 0);
   const available = useMemo(() => {
     if (!discovery.data) return null;
     return new Set([...discovery.data.map((r) => r.type), ...BUILTIN_TYPES]);
