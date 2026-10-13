@@ -37,6 +37,7 @@ export const HELM_TYPE = 'helm-releases';
 /** Pseudo kinds for screens that are not resource lists. */
 export const DASHBOARD_TYPE = 'dashboard';
 export const MAP_TYPE = 'map';
+export const TRACKED_TYPE = 'tracked';
 
 /** Features that exist in the code but are not released yet. */
 export const FEATURES = {
@@ -45,7 +46,7 @@ export const FEATURES = {
 };
 
 /** Types that are always offered, whatever the cluster's API discovery says. */
-export const BUILTIN_TYPES: string[] = [HELM_TYPE, DASHBOARD_TYPE, ...(FEATURES.relationMap ? [MAP_TYPE] : [])];
+export const BUILTIN_TYPES: string[] = [HELM_TYPE, DASHBOARD_TYPE, TRACKED_TYPE, ...(FEATURES.relationMap ? [MAP_TYPE] : [])];
 
 const name: Column = { key: 'name', label: 'col.name', get: (o) => o.metadata?.name ?? '', sort: (o) => o.metadata?.name ?? '', grow: true };
 const namespace: Column = { key: 'ns', label: 'col.namespace', get: (o) => o.metadata?.namespace ?? '', sort: (o) => o.metadata?.namespace ?? '' };
@@ -85,6 +86,7 @@ const fluxActions: ActionName[] = ['reconcile', 'suspend', 'resume'];
 export const KINDS: Kind[] = [
   // ---- Overview screens
   { type: DASHBOARD_TYPE, label: 'Dashboard', kind: 'Dashboard', short: ['dash', 'home'], section: 'overview', columns: [] },
+  { type: TRACKED_TYPE, label: 'Tracked', kind: 'Tracked', short: ['tracked', 'star'], section: 'overview', columns: [] },
   ...(FEATURES.relationMap
     ? [{ type: MAP_TYPE, label: 'Map', kind: 'Map', short: ['map', 'graph', 'topology'], section: 'overview', columns: [] } as Kind]
     : []),

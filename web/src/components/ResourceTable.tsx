@@ -185,7 +185,7 @@ function cls(c: Column): string {
   return [c.mono && 'mono', c.align === 'right' && 'right', c.grow && 'grow'].filter(Boolean).join(' ');
 }
 
-function renderCell(c: Cell) {
+export function renderCell(c: Cell) {
   if (typeof c !== 'object') return c;
   if (c.tone && c.plain) return <span className={`mono tone-${c.tone}`} title={c.title}>{c.text}</span>;
   if (c.tone) return <Badge tone={c.tone} title={c.title}>{c.text}</Badge>;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ContextInfo, type PortForward, type Settings } from '../api';
 import {
-  BUILTIN_TYPES, DASHBOARD_TYPE, FEATURES, HELM_TYPE, KIND_BY_TYPE, MAP_TYPE, genericKind, isScreen, kindByName, kindLabel,
+  BUILTIN_TYPES, DASHBOARD_TYPE, FEATURES, HELM_TYPE, KIND_BY_TYPE, MAP_TYPE, TRACKED_TYPE, genericKind, isScreen, kindByName, kindLabel,
   type ActionName, type Kind,
 } from '../catalog';
 import { isTyping, useAsync, useKey } from '../hooks';
@@ -14,6 +14,7 @@ import { DetailDrawer, type Target } from './DetailDrawer';
 import { ForwardDialog } from './PortForward';
 import { RelationMap } from './RelationMap';
 import { ResourceTable, rowKey } from './ResourceTable';
+import { Tracked } from './Tracked';
 import { Empty, ErrorBanner, Icon, Spinner } from './ui';
 
 export const ALL = '*';
@@ -55,8 +56,11 @@ export function TabView(props: Props) {
   const ctxInfo = contexts.find((c) => c.name === ctx);
 
   const [filter, setFilter] = useState('');
-  const [dialog, setDialog] = useState<{ action: ActionName; target: Target; obj: any } | null>(null);
-  const [forwardFor, setForwardFor] = useState<{ target: Target; obj: any } | null>(null);
+  // `ctx`: the Tracked screen acts on pods of other contexts than the tab's.
+  const [dialog, setDialog] = useState<{ action: ActionName; target: Target; obj: any; ctx: string } | null>(null);
+  const [forwardFor, setForwardFor] = useState<{ target: Target; obj: any; ctx: string } | null>(null);
+  /** Pod open in the drawer of the Tracked screen, with its own context. */
+  const [trackedSel, setTrackedSel] = useState<{ ctx: string; pod: any } | null>(null);
   const filterRef = useRef<HTMLInputElement>(null);
 
   const isProtected = settings.protectedContexts.includes(ctx);
@@ -78,6 +82,7 @@ export function TabView(props: Props) {
   );
   const screen = isScreen(kind);
   const showList = !screen && !tab.detail;
+  const onTracked = kind.type === TRACKED_TYPE && !tab.detail;
 
   const list = useAsync(
     async () => {
@@ -161,6 +166,8 @@ export function TabView(props: Props) {
       filterRef.current?.focus();
     } else if (e.key === 'Escape' && !isTyping(e) && target && !tab.detail) {
       closeTarget();
+    } else if (e.key === 'Escape' && !isTyping(e) && onTracked && trackedSel) {
+      setTrackedSel(null);
     }
   });
 
@@ -179,14 +186,46 @@ export function TabView(props: Props) {
     target,
     refreshMs,
     onNavigate: navigateTo,
-    onAction: (action: ActionName, tg: Target, obj: any) => setDialog({ action, target: tg, obj }),
-    onForward: (tg: Target, obj: any) => setForwardFor({ target: tg, obj }),
+    onAction: (action: ActionName, tg: Target, obj: any) => setDialog({ action, target: tg, obj, ctx }),
+    onForward: (tg: Target, obj: any) => setForwardFor({ target: tg, obj, ctx }),
     onOpenNewWindow: () => props.onOpenWindow(routeFor(target.kind, target.name, target.ns), true),
     ...(trackedPod && {
       tracked: isTracked(settings.tracked, ctx, trackedPod),
       onToggleTrack: () => toggleTrack(trackedPod),
     }),
   };
+
+  // ---- Tracked screen: the drawer uses the pod's context, not the tab's.
+  const trackedDrawer = onTracked && trackedSel && (() => {
+    const sel = trackedSel;
+    const podKind = KIND_BY_TYPE.get('pods')!;
+    const podNs: string | undefined = sel.pod.metadata?.namespace;
+    const tg: Target = { kind: podKind, name: sel.pod.metadata?.name ?? '', ns: podNs };
+    const podRoute: Route = { ctx: sel.ctx, ns: podNs ?? ALL, type: podKind.type, target: { type: podKind.type, name: tg.name, ns: podNs } };
+    return (
+      <DetailDrawer
+        key={`${sel.ctx}/pods/${tg.ns}/${tg.name}`}
+        ctx={sel.ctx}
+        target={tg}
+        refreshMs={refreshMs}
+        onClose={() => setTrackedSel(null)}
+        // Leaves the Tracked screen: the tab switches to the pod's context and shows the linked resource.
+        onNavigate={(kindName, name, targetNs) => {
+          const k = kindByName(kindName);
+          if (!k) return;
+          setTrackedSel(null);
+          onNavigate({ ctx: sel.ctx, ns: targetNs ?? podNs ?? ALL, type: k.type, target: { type: k.type, name, ns: targetNs } }, { detail: false });
+          props.onVisit(sel.ctx, { kind: k, name, ns: targetNs });
+        }}
+        onAction={(action, t2, obj) => setDialog({ action, target: t2, obj, ctx: sel.ctx })}
+        onForward={(t2, obj) => setForwardFor({ target: t2, obj, ctx: sel.ctx })}
+        onOpenNewTab={() => props.onOpenTab(podRoute, true)}
+        onOpenNewWindow={() => props.onOpenWindow(podRoute, true)}
+        tracked={isTracked(settings.tracked, sel.ctx, sel.pod)}
+        onToggleTrack={() => save({ tracked: toggleTracked(settings.tracked, sel.ctx, sel.pod) })}
+      />
+    );
+  })();
 
   return (
     <div className="tab-view" style={visible ? undefined : { display: 'none' }}>
@@ -196,6 +235,8 @@ export function TabView(props: Props) {
           <button className="btn btn-ghost btn-sm" onClick={props.onForward} disabled={!tab.forward.length} title={t('topbar.forward')}><Icon name="forward" /></button>
         </div>
 
+        {/* The Tracked screen spans every context and namespace. */}
+        {!onTracked && <>
         <div className="picker" title={t('topbar.context')}>
           <label>ctx</label>
           <span className="picker-dot" />
@@ -227,6 +268,7 @@ export function TabView(props: Props) {
             </select>
           )}
         </div>
+        </>}
 
         {showList || kind.type === MAP_TYPE ? (
           <div className="search-box grow">
@@ -274,14 +316,27 @@ export function TabView(props: Props) {
                 </div>
               </div>
               <span className="spacer" />
-              <span className="muted small ctx-summary">
-                {ctx} · {list.data?.namespaced === false ? t('content.clusterScoped') : ns === ALL ? t('content.allNamespaces') : ns}
-              </span>
+              {!onTracked && (
+                <span className="muted small ctx-summary">
+                  {ctx} · {list.data?.namespaced === false ? t('content.clusterScoped') : ns === ALL ? t('content.allNamespaces') : ns}
+                </span>
+              )}
             </div>
 
             {kind.type === DASHBOARD_TYPE && (
               <div className="screen-scroll">
                 <Dashboard ctx={ctx} ns={ns} refreshMs={refreshMs} onOpen={navigateTo} />
+              </div>
+            )}
+            {onTracked && (
+              <div className="screen-scroll">
+                <Tracked
+                  settings={settings}
+                  save={save}
+                  refreshMs={refreshMs}
+                  selected={trackedSel && { ctx: trackedSel.ctx, ns: trackedSel.pod.metadata?.namespace ?? '', name: trackedSel.pod.metadata?.name ?? '' }}
+                  onOpen={(podCtx, pod) => setTrackedSel({ ctx: podCtx, pod })}
+                />
               </div>
             )}
             {FEATURES.relationMap && kind.type === MAP_TYPE && (
@@ -312,6 +367,7 @@ export function TabView(props: Props) {
                       setDialog({
                         action,
                         obj: item,
+                        ctx,
                         target: {
                           kind,
                           name: helmRow ? item.name : item.metadata.name,
@@ -346,27 +402,30 @@ export function TabView(props: Props) {
         />
       )}
 
+      {trackedDrawer}
+
       {dialog && (
         <ActionDialog
-          ctx={ctx}
+          ctx={dialog.ctx}
           action={dialog.action}
           target={dialog.target}
           obj={dialog.obj}
-          isProtected={isProtected}
+          isProtected={settings.protectedContexts.includes(dialog.ctx)}
           onClose={() => setDialog(null)}
           onDone={(message) => {
             const deleted = dialog.action === 'delete';
             setDialog(null);
             props.onToast(message);
             list.reload();
-            if (deleted && !tab.detail) closeTarget();
+            if (deleted && onTracked) setTrackedSel(null);
+            else if (deleted && !tab.detail) closeTarget();
           }}
         />
       )}
 
       {forwardFor && (
         <ForwardDialog
-          ctx={ctx}
+          ctx={forwardFor.ctx}
           target={forwardFor.target}
           obj={forwardFor.obj}
           onClose={() => setForwardFor(null)}
