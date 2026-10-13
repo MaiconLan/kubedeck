@@ -133,6 +133,8 @@ export const ptBR: Messages = {
   'drawer.label': 'Detalhes',
   'drawer.in': 'em {ns}',
   'drawer.close': 'Fechar (Esc)',
+  'track.add': 'Acompanhar',
+  'track.remove': 'Parar de acompanhar',
   'tab.overview': 'Visão geral',
   'tab.logs': 'Logs',
   'tab.values': 'Valores',

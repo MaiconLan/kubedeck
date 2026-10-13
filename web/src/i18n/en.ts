@@ -132,6 +132,8 @@ export const en = {
   'drawer.label': 'Details',
   'drawer.in': 'in {ns}',
   'drawer.close': 'Close (Esc)',
+  'track.add': 'Track',
+  'track.remove': 'Stop tracking',
   'tab.overview': 'Overview',
   'tab.logs': 'Logs',
   'tab.values': 'Values',

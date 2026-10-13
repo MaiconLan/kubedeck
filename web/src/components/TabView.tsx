@@ -6,6 +6,7 @@ import {
 } from '../catalog';
 import { isTyping, useAsync, useKey } from '../hooks';
 import { t } from '../i18n';
+import { isTracked, toggleTracked } from '../tracked';
 import type { Route, Tab } from '../tabs';
 import { ActionDialog } from './ActionDialog';
 import { Dashboard } from './Dashboard';
@@ -168,6 +169,11 @@ export function TabView(props: Props) {
     ? items.map(rowKey).find((_, i) => (items[i].metadata?.name ?? items[i].name) === target.name)
     : undefined;
 
+  const toggleTrack = (pod: any) => save({ tracked: toggleTracked(settings.tracked, ctx, pod) });
+  const trackedPod = target?.kind.type === 'pods'
+    ? items.find((p) => p.metadata?.name === target.name && (p.metadata?.namespace ?? undefined) === target.ns)
+    : undefined;
+
   const drawerProps = target && {
     ctx,
     target,
@@ -176,6 +182,10 @@ export function TabView(props: Props) {
     onAction: (action: ActionName, tg: Target, obj: any) => setDialog({ action, target: tg, obj }),
     onForward: (tg: Target, obj: any) => setForwardFor({ target: tg, obj }),
     onOpenNewWindow: () => props.onOpenWindow(routeFor(target.kind, target.name, target.ns), true),
+    ...(trackedPod && {
+      tracked: isTracked(settings.tracked, ctx, trackedPod),
+      onToggleTrack: () => toggleTrack(trackedPod),
+    }),
   };
 
   return (
@@ -310,6 +320,15 @@ export function TabView(props: Props) {
                         },
                       });
                     }}
+                    leading={kind.type === 'pods' ? (pod) => {
+                      const on = isTracked(settings.tracked, ctx, pod);
+                      return (
+                        <button className={`btn btn-ghost btn-sm star-btn${on ? ' on' : ''}`} onClick={() => toggleTrack(pod)}
+                          title={t(on ? 'track.remove' : 'track.add')} aria-label={t(on ? 'track.remove' : 'track.add')}>
+                          <Icon name="star" size={14} />
+                        </button>
+                      );
+                    } : undefined}
                   />
                 )}
               </>

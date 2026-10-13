@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { HELM_TYPE, type ActionName, type Cell, type Column, type Kind } from '../catalog';
 import { condition, podStatus, ratio, readyCount } from '../format';
 import { t } from '../i18n';
@@ -15,6 +15,8 @@ interface Props {
   onOpen: (item: any, newTab: boolean) => void;
   /** Runs an action from the right-click menu. */
   onAction?: (action: ActionName, item: any) => void;
+  /** Renders a narrow first column (e.g. a star button). */
+  leading?: (item: any) => ReactNode;
 }
 
 /** Actions that apply to this row right now (suspend/resume depend on its state). */
@@ -94,7 +96,7 @@ function rowTone(kind: Kind, item: any): 'err' | 'done' | undefined {
   }
 }
 
-export function ResourceTable({ kind, items, filter, showNamespace, selectedKey, onOpen, onAction }: Props) {
+export function ResourceTable({ kind, items, filter, showNamespace, selectedKey, onOpen, onAction, leading }: Props) {
   const [menu, setMenu] = useState<{ item: any; x: number; y: number }>();
   const columns = useMemo(
     () => kind.columns.filter((c) => showNamespace || c.key !== 'ns'),
@@ -134,6 +136,7 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
       <table className="grid">
         <thead>
           <tr>
+            {leading && <th className="lead-cell" />}
             {columns.map((c) => (
               <th key={c.key} className={`${c.align === 'right' ? 'right' : ''}${c.grow ? ' grow' : ''}`} onClick={() => toggleSort(c)}>
                 {t(c.label)}
@@ -159,6 +162,7 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
                   setMenu({ item, x: e.clientX, y: e.clientY });
                 }}
               >
+                {leading && <td className="lead-cell" onClick={(e) => e.stopPropagation()}>{leading(item)}</td>}
                 {columns.map((c) => <td key={c.key} className={cls(c)}>{renderCell(c.get(item))}</td>)}
               </tr>
             );
