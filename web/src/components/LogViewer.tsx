@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, type ApiError } from '../api';
 import { t, type MessageKey } from '../i18n';
+import { FindNav, marked, useFind } from './find';
 import { ErrorBanner, Icon, Spinner } from './ui';
 
 const MAX_LINES = 10_000;
@@ -72,6 +73,8 @@ export function LogViewer({ ctx, ns, type, name, containers, initialPrevious = f
 
   const q = query.trim().toLowerCase();
   const visible = q && onlyMatches ? lines.current.filter((l) => l.toLowerCase().includes(q)) : lines.current;
+  // Search what is on screen (without the timestamp column), and stop following the tail while navigating.
+  const find = useFind(visible.map((l) => splitLine(l, timestamps).message), q, body, () => { stick.current = false; });
 
   const download = () => {
     const blob = new Blob([lines.current.join('\n')], { type: 'text/plain' });
@@ -101,7 +104,8 @@ export function LogViewer({ ctx, ns, type, name, containers, initialPrevious = f
         <Toggle on={wrap} set={setWrap} label={t('logs.wrap')} />
         <div className="search-box">
           <Icon name="search" size={14} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('logs.search')} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={find.onKeyDown} placeholder={t('logs.search')} />
+          <FindNav find={find} />
         </div>
         {q && <Toggle on={onlyMatches} set={setOnlyMatches} label={t('logs.onlyMatches')} />}
         <span className="spacer" />
@@ -128,7 +132,7 @@ export function LogViewer({ ctx, ns, type, name, containers, initialPrevious = f
         }}
       >
         {visible.length === 0 && status !== 'connecting' && !error && <div className="log-empty">{t('logs.empty')}</div>}
-        {visible.map((line, i) => <LogLine key={i} line={line} query={q} timestamps={timestamps} />)}
+        {visible.map((line, i) => <LogLine key={i} line={line} timestamps={timestamps} qLen={q.length} starts={find.startsIn(i)} activeStart={find.activeIn(i)} />)}
       </div>
       {!stick.current && (
         <button className="btn jump-bottom" onClick={() => {
@@ -177,37 +181,28 @@ function clock(ts: string): string {
   return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':');
 }
 
-function LogLine({ line, query, timestamps }: { line: string; query: string; timestamps: boolean }) {
-  let ts = '';
-  let message = line;
-  if (timestamps) {
-    const m = TS_RE.exec(line);
-    if (m) {
-      ts = m[2];
-      message = (m[1] ?? '') + m[3];
-    }
-  }
+/** Separates the kubectl timestamp from the message when the timestamp column is shown. */
+function splitLine(line: string, timestamps: boolean): { ts: string; message: string } {
+  const m = timestamps ? TS_RE.exec(line) : null;
+  return m ? { ts: m[2], message: (m[1] ?? '') + m[3] } : { ts: '', message: line };
+}
+
+interface LogLineProps {
+  line: string;
+  timestamps: boolean;
+  qLen: number;
+  starts: number[] | undefined;
+  activeStart: number;
+}
+
+function LogLine({ line, timestamps, qLen, starts, activeStart }: LogLineProps) {
+  const { ts, message } = splitLine(line, timestamps);
   const level = lineLevel(message);
   return (
     <div className={`log-line${level ? ` l-${level}` : ''}`}>
       {timestamps && <span className="log-ts" title={ts}>{clock(ts)}</span>}
       {level ? <span className={`lvl lvl-${level}`}>{t(LEVEL_LABEL[level])}</span> : <span />}
-      <span className="log-msg">{highlight(message, query)}</span>
+      <span className="log-msg">{marked(message, 0, starts, qLen, activeStart) || ' '}</span>
     </div>
   );
-}
-
-function highlight(line: string, q: string): ReactNode {
-  if (!q) return line || ' ';
-  const lower = line.toLowerCase();
-  const parts: ReactNode[] = [];
-  let from = 0;
-  let idx = lower.indexOf(q);
-  while (idx >= 0) {
-    parts.push(line.slice(from, idx), <mark key={idx}>{line.slice(idx, idx + q.length)}</mark>);
-    from = idx + q.length;
-    idx = lower.indexOf(q, from);
-  }
-  parts.push(line.slice(from));
-  return parts;
 }

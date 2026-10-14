@@ -108,6 +108,7 @@ const PATHS: Record<string, string> = {
   chevron: 'M9 6l6 6-6 6',
   cube: 'M12 2 3 7v10l9 5 9-5V7zM3 7l9 5 9-5M12 12v10',
   arrowDown: 'M12 5v14m-6-6 6 6 6-6',
+  arrowUp: 'M12 19V5m-6 6 6-6 6 6',
   plus: 'M12 5v14M5 12h14',
   tabNew: 'M3 7h18v13H3zM3 7l2-3h6l2 3M12 11v6m-3-3h6',
   window: 'M3 4h18v16H3zM3 9h18M14 13h4v4',

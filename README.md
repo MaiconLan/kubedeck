@@ -302,6 +302,8 @@ Ideas and votes are welcome in [issues](../../issues).
 
 Contributions of all sizes are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the setup (the demo mode
 means you don't even need a cluster), project layout, and how to add a diagnosis rule or a language.
+To contribute, fork the repository, push a branch to your fork and open a pull request; every pull request
+needs the maintainer's approval before it is merged ([details](CONTRIBUTING.md#submitting-changes)).
 Please follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
