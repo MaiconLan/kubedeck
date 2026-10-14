@@ -14,6 +14,8 @@ export const ptBR: Messages = {
   'common.optional': 'opcional',
   'common.searchText': 'Buscar no texto',
   'common.wrapLines': 'Quebrar linhas',
+  'common.findPrev': 'Ocorrência anterior (Shift+Enter)',
+  'common.findNext': 'Próxima ocorrência (Enter)',
   'common.yes': 'sim',
   'common.no': 'não',
 

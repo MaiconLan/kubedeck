@@ -36,6 +36,7 @@
   --y-bool: #f0abfc;
   --y-comment: #5b6370;
   --mark: rgba(245, 184, 61, 0.35);
+  --mark-active: #f5b83d;
   --font-mono: 'Geist Mono', 'Cascadia Code', Consolas, monospace;
   color-scheme: dark;
 }
@@ -72,6 +73,7 @@
   --y-bool: #a21caf;
   --y-comment: #94a3b8;
   --mark: rgba(251, 191, 36, 0.45);
+  --mark-active: #f59e0b;
   --ink-on-accent: #ffffff;
   --debug: #64748b;
   --debug-soft: rgba(100, 116, 139, 0.12);
@@ -268,7 +270,13 @@ kbd {
 .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search-box input { border: 0; background: transparent; padding: 0; flex: 1; box-shadow: none; height: 100%; }
 .search-box.grow { flex: 1; max-width: 520px; }
-.search-count { font-size: 11px; color: var(--accent); }
+.search-count { font-size: 11px; color: var(--accent); white-space: nowrap; }
+.find-step {
+  display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; flex-shrink: 0;
+  border: 0; border-radius: 4px; background: transparent; color: var(--text-3); cursor: pointer;
+}
+.find-step:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.find-step:disabled { opacity: 0.4; cursor: default; }
 .refresh { display: flex; align-items: center; gap: 2px; }
 .select-sm { padding: 3px 24px 3px 8px; font-size: 12px; height: 28px; border-radius: 7px; }
 
@@ -476,7 +484,8 @@ table.mini td { padding: 7px 8px; border-bottom: 1px solid var(--border-soft); v
 .log-line.l-debug .log-msg { color: #7d8490; }
 :root[data-theme='light'] .log-line.l-err .log-msg { color: var(--err); }
 :root[data-theme='light'] .log-line.l-warn .log-msg { color: var(--warn); }
-.log-line mark { background: var(--mark); color: inherit; border-radius: 2px; }
+.log-line mark, .code-line mark { background: var(--mark); color: inherit; border-radius: 2px; }
+.log-line mark.active, .code-line mark.active { background: var(--mark-active); color: #1a1300; box-shadow: 0 0 0 1px var(--mark-active); }
 .log-empty { padding: 20px 16px; color: var(--text-3); }
 .log-warning { padding: 6px 16px; font-size: 12px; color: var(--warn); background: var(--warn-soft); white-space: pre-wrap; }
 .stream-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }

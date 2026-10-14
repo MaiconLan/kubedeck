@@ -13,6 +13,8 @@ export const en = {
   'common.optional': 'optional',
   'common.searchText': 'Search text',
   'common.wrapLines': 'Wrap lines',
+  'common.findPrev': 'Previous match (Shift+Enter)',
+  'common.findNext': 'Next match (Enter)',
   'common.yes': 'yes',
   'common.no': 'no',
 
