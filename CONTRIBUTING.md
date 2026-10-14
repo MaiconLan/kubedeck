@@ -15,6 +15,25 @@ npm run dev:web      # UI with hot reload on http://localhost:5173/?t=dev
 Use `npm run dev:server` instead of `dev:demo` to work against your real kubeconfig, and
 `npm run dev:desktop` (in a third terminal) to see the same UI inside the desktop window.
 
+## Submitting changes
+
+You don't need write access to this repository. Contributions come in through a fork:
+
+1. **Fork** the repository with the "Fork" button at the top right of the GitHub page.
+2. **Clone your fork** and create a branch from `main`, e.g. `git switch -c fix/pod-logs`.
+3. Make your changes and push the branch **to your fork**.
+4. Open a **pull request** from your branch to `main` of this repository.
+
+Rules of the road:
+
+- `main` is protected: nobody pushes to it directly, every change goes through a pull request.
+- A pull request can only be merged after approval from the maintainer, and the maintainer does the merge
+  (squash). If a review leaves comments, resolve them and push again; new pushes require a fresh approval.
+- Pushing branches directly to this repository requires write access, which is limited to the maintainer.
+  If you hit a permission error on `git push`, you are probably pushing to the original repository instead
+  of your fork.
+- For larger changes, open an [issue](../../issues) first so we can agree on the approach.
+
 Before opening a pull request:
 
 ```bash
