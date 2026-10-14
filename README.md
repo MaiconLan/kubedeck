@@ -57,8 +57,7 @@ No cluster needed: the demo mode ships with a realistic fake cluster (fictional 
 git clone https://github.com/maiconlan/kubedeck.git
 cd kubedeck
 npm install
-npm run desktop:demo     # desktop app
-# or: npm run demo       # same thing in your browser
+npm run demo
 ```
 
 When you are ready, run `npm run desktop` instead and KubeDeck uses your real kubeconfig.

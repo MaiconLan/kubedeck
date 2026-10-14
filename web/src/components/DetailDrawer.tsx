@@ -33,13 +33,14 @@ interface Props {
   onOpenNewWindow?: () => void;
 }
 
-const ACTION_META: Record<ActionName, { label: MessageKey; icon: string; danger?: boolean }> = {
+export const ACTION_META: Record<ActionName, { label: MessageKey; icon: string; danger?: boolean }> = {
   restart: { label: 'action.restart', icon: 'restart' },
   scale: { label: 'action.scale', icon: 'scale' },
   delete: { label: 'action.delete', icon: 'trash', danger: true },
   reconcile: { label: 'action.reconcile', icon: 'sync' },
   suspend: { label: 'action.suspend', icon: 'suspend' },
   resume: { label: 'action.resume', icon: 'resume' },
+  trigger: { label: 'action.trigger', icon: 'resume' },
 };
 
 export function DetailDrawer(props: Props) {
@@ -200,7 +201,7 @@ function EventsTab({ ctx, kind, name, ns }: { ctx: string; kind: string; name: s
 
 type HelmTab = 'status' | 'values' | 'values-all' | 'history' | 'manifest' | 'notes';
 
-function HelmDetail({ ctx, target }: Props) {
+function HelmDetail({ ctx, target, onAction }: Props) {
   const [tab, setTab] = useState<HelmTab>('status');
   const ns = target.ns ?? target.row?.namespace ?? '';
   const tabs: Array<[HelmTab, MessageKey]> = [
@@ -219,6 +220,14 @@ function HelmDetail({ ctx, target }: Props) {
             <button key={id} className={`tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>{t(label)}</button>
           ))}
         </nav>
+        <div className="drawer-actions">
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => onAction('delete', { ...target, ns }, target.row)}
+          >
+            <Icon name={ACTION_META.delete.icon} /> {t('action.uninstall')}
+          </button>
+        </div>
       </div>
       <div className="drawer-body">
         {tab === 'history'

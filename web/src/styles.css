@@ -311,6 +311,20 @@ kbd {
 .grid tbody tr:hover td { background: var(--hover); }
 .grid tbody tr.selected td { background: var(--selected); }
 .grid tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.grid tbody tr.row-err td, .grid tbody tr.row-err td:first-child { color: var(--err); }
+.grid tbody tr.row-done td, .grid tbody tr.row-done td:first-child { color: #7a8ba6; }
+:root[data-theme='light'] .grid tbody tr.row-done td, :root[data-theme='light'] .grid tbody tr.row-done td:first-child { color: #64748b; }
+.ctx-menu {
+  position: fixed; z-index: 70; min-width: 180px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.ctx-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.ctx-item:hover { background: var(--hover); }
+.ctx-item.danger { color: var(--err); }
+.ctx-item.danger:hover { background: var(--err-soft); }
 .table-empty { padding: 24px; text-align: center; color: var(--text-3); }
 .loading-rows { display: flex; flex-direction: column; gap: 8px; }
 .skeleton {

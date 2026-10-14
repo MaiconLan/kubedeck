@@ -841,6 +841,18 @@ function kubectlCmd(args: string[], command: string): string {
       const tail = Math.min(Number(f['--tail'] ?? 20), 40);
       return Array.from({ length: tail }, (_, n) => logLine(pod, n, false, false, container)).join('\n') + '\n';
     }
+    case 'create': {
+      const [, cjName] = String(f['--from'] ?? '').split('/');
+      const cj = w.objects.find((x) => x.kind === 'CronJob' && x.metadata.name === cjName && (!ns || x.metadata.namespace === ns));
+      if (pos[1] !== 'job' || !cj) err(`Error from server (NotFound): cronjobs.batch "${cjName}" not found`, command);
+      const jobName = pos[2];
+      w.objects.push({
+        apiVersion: 'batch/v1', kind: 'Job', metadata: meta(jobName, cj.metadata.namespace, { age: 0 }),
+        spec: { completions: 1, backoffLimit: 3, selector: { matchLabels: { 'job-name': jobName } }, template: cj.spec.jobTemplate.spec.template },
+        status: { active: 1, startTime: new Date().toISOString() },
+      });
+      return `job.batch/${jobName} created\n`;
+    }
     case 'rollout':
     case 'scale':
     case 'delete':
@@ -871,6 +883,11 @@ function mutate(w: World, pos: string[], f: Record<string, string | true>, comma
     }
     for (const wl of w.objects.filter((x) => ['Deployment', 'StatefulSet', 'DaemonSet'].includes(x.kind) && x.metadata.namespace === o.metadata.namespace && matches(o.metadata.labels, x.spec.selector?.matchLabels ?? {}))) refreshStatus(w, wl);
     return `pod "${name}" deleted\n`;
+  }
+
+  if (pos[0] === 'delete' && o.kind === 'Job') {
+    w.objects.splice(w.objects.indexOf(o), 1);
+    return `job.batch "${name}" deleted\n`;
   }
 
   if (pos[0] === 'scale' && typeof f['--replicas'] === 'string') {
@@ -935,6 +952,10 @@ function helmCmd(args: string[], command: string): string {
   const name = pos[0] === 'get' ? pos[2] : pos[1];
   const r = RELEASES.find((x) => x.name === name);
   if (!r) err(`Error: release: not found`, command);
+  if (pos[0] === 'uninstall') {
+    RELEASES.splice(RELEASES.indexOf(r), 1);
+    return `release "${r.name}" uninstalled\n`;
+  }
   const what = pos[0] === 'get' ? pos[1] : pos[0];
   switch (what) {
     case 'status':

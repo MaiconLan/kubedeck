@@ -17,7 +17,7 @@ export interface Column {
   align?: 'right';
 }
 
-export type ActionName = 'restart' | 'scale' | 'delete' | 'reconcile' | 'suspend' | 'resume';
+export type ActionName = 'restart' | 'scale' | 'delete' | 'reconcile' | 'suspend' | 'resume' | 'trigger';
 
 export interface Kind {
   /** kubectl resource type, fully qualified for non-core groups. */
@@ -199,7 +199,7 @@ export const KINDS: Kind[] = [
     ],
   },
   {
-    type: 'jobs.batch', label: 'Jobs', kind: 'Job', short: ['job'], section: 'workloads', logs: true,
+    type: 'jobs.batch', label: 'Jobs', kind: 'Job', short: ['job'], section: 'workloads', logs: true, actions: ['suspend', 'resume', 'delete'],
     columns: [
       name, namespace,
       {
@@ -223,7 +223,7 @@ export const KINDS: Kind[] = [
     ],
   },
   {
-    type: 'cronjobs.batch', label: 'CronJobs', kind: 'CronJob', short: ['cj'], section: 'workloads',
+    type: 'cronjobs.batch', label: 'CronJobs', kind: 'CronJob', short: ['cj'], section: 'workloads', actions: ['trigger', 'suspend', 'resume'],
     columns: [
       name, namespace,
       { key: 'schedule', label: 'col.schedule', mono: true, get: (o) => o.spec?.schedule ?? '' },
@@ -385,7 +385,7 @@ export const KINDS: Kind[] = [
 
   // ---- Helm (pseudo kind, backed by `helm list`)
   {
-    type: HELM_TYPE, label: 'Releases', kind: 'HelmRelease', short: ['helm', 'releases'], section: 'helm',
+    type: HELM_TYPE, label: 'Releases', kind: 'HelmRelease', short: ['helm', 'releases'], section: 'helm', actions: ['delete'],
     columns: [
       { key: 'name', label: 'col.name', grow: true, get: (o) => o.name, sort: (o) => o.name },
       { key: 'ns', label: 'col.namespace', get: (o) => o.namespace, sort: (o) => o.namespace },
