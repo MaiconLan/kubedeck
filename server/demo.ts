@@ -935,6 +935,10 @@ function helmCmd(args: string[], command: string): string {
   const name = pos[0] === 'get' ? pos[2] : pos[1];
   const r = RELEASES.find((x) => x.name === name);
   if (!r) err(`Error: release: not found`, command);
+  if (pos[0] === 'uninstall') {
+    RELEASES.splice(RELEASES.indexOf(r), 1);
+    return `release "${r.name}" uninstalled\n`;
+  }
   const what = pos[0] === 'get' ? pos[1] : pos[0];
   switch (what) {
     case 'status':

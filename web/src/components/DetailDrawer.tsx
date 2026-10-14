@@ -200,7 +200,7 @@ function EventsTab({ ctx, kind, name, ns }: { ctx: string; kind: string; name: s
 
 type HelmTab = 'status' | 'values' | 'values-all' | 'history' | 'manifest' | 'notes';
 
-function HelmDetail({ ctx, target }: Props) {
+function HelmDetail({ ctx, target, onAction }: Props) {
   const [tab, setTab] = useState<HelmTab>('status');
   const ns = target.ns ?? target.row?.namespace ?? '';
   const tabs: Array<[HelmTab, MessageKey]> = [
@@ -219,6 +219,14 @@ function HelmDetail({ ctx, target }: Props) {
             <button key={id} className={`tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>{t(label)}</button>
           ))}
         </nav>
+        <div className="drawer-actions">
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => onAction('delete', { ...target, ns }, target.row)}
+          >
+            <Icon name={ACTION_META.delete.icon} /> {t('action.uninstall')}
+          </button>
+        </div>
       </div>
       <div className="drawer-body">
         {tab === 'history'

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, errorOf, type ApiError } from '../api';
-import type { ActionName } from '../catalog';
+import { HELM_TYPE, type ActionName } from '../catalog';
 import { t, type MessageKey } from '../i18n';
 import type { Target } from './DetailDrawer';
 import { ErrorBanner, Icon, Spinner } from './ui';
@@ -17,13 +17,13 @@ interface Props {
 
 const DANGER: Partial<Record<ActionName, boolean>> = { delete: true, suspend: true };
 
-function copyFor(action: ActionName) {
-  const key = (part: string) => `actionDialog.${action}.${part}` as MessageKey;
+function copyFor(action: ActionName, isHelm: boolean) {
+  const key = (part: string) => `actionDialog.${isHelm && action === 'delete' ? 'uninstall' : action}.${part}` as MessageKey;
   return { title: t(key('title')), verb: t(key('verb')), explain: t(key('explain')), danger: !!DANGER[action] };
 }
 
 export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, onDone }: Props) {
-  const copy = copyFor(action);
+  const copy = copyFor(action, target.kind.type === HELM_TYPE);
   const [replicas, setReplicas] = useState<number>(obj?.spec?.replicas ?? 1);
   const [typed, setTyped] = useState('');
   const [command, setCommand] = useState('');

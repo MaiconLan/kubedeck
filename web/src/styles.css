@@ -311,6 +311,9 @@ kbd {
 .grid tbody tr:hover td { background: var(--hover); }
 .grid tbody tr.selected td { background: var(--selected); }
 .grid tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.grid tbody tr.row-err td, .grid tbody tr.row-err td:first-child { color: var(--err); }
+.grid tbody tr.row-done td, .grid tbody tr.row-done td:first-child { color: #7a8ba6; }
+:root[data-theme='light'] .grid tbody tr.row-done td, :root[data-theme='light'] .grid tbody tr.row-done td:first-child { color: #64748b; }
 .table-empty { padding: 24px; text-align: center; color: var(--text-3); }
 .loading-rows { display: flex; flex-direction: column; gap: 8px; }
 .skeleton {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Cell, Column, Kind } from '../catalog';
+import { condition, podStatus, ratio, readyCount } from '../format';
 import { t } from '../i18n';
 import { Badge } from './ui';
 
@@ -19,6 +20,31 @@ export function rowKey(item: any): string {
 
 function cellText(c: Cell): string {
   return typeof c === 'object' ? c.text : String(c ?? '');
+}
+
+/** Whole-row highlight: `err` for failing workloads, `done` for finished ones (Completed pods, completed Jobs). */
+function rowTone(kind: Kind, item: any): 'err' | 'done' | undefined {
+  switch (kind.type) {
+    case 'pods': {
+      const s = podStatus(item);
+      if (s.tone === 'err') return 'err';
+      if (s.tone === 'muted') return 'done';
+      const [r, total] = readyCount(item);
+      return s.text === 'Running' && total > 0 && r === 0 ? 'err' : undefined;
+    }
+    case 'deployments.apps':
+    case 'statefulsets.apps':
+      return ratio(item.status?.readyReplicas, item.spec?.replicas).tone === 'err' ? 'err' : undefined;
+    case 'daemonsets.apps':
+      return ratio(item.status?.numberReady, item.status?.desiredNumberScheduled).tone === 'err' ? 'err' : undefined;
+    case 'replicasets.apps':
+      return ratio(item.status?.readyReplicas, item.spec?.replicas).tone === 'err' ? 'err' : undefined;
+    case 'jobs.batch':
+      if (condition(item, 'Failed')?.status === 'True') return 'err';
+      return condition(item, 'Complete')?.status === 'True' ? 'done' : undefined;
+    default:
+      return undefined;
+  }
 }
 
 export function ResourceTable({ kind, items, filter, showNamespace, selectedKey, onOpen }: Props) {
@@ -71,10 +97,11 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
         <tbody>
           {rows.map((item) => {
             const key = rowKey(item);
+            const tone = rowTone(kind, item);
             return (
               <tr
                 key={key}
-                className={key === selectedKey ? 'selected' : ''}
+                className={[key === selectedKey && 'selected', tone && `row-${tone}`].filter(Boolean).join(' ')}
                 onClick={(e) => onOpen(item, e.ctrlKey || e.metaKey)}
                 onMouseDown={(e) => e.button === 1 && e.preventDefault()}
                 onAuxClick={(e) => e.button === 1 && onOpen(item, true)}
