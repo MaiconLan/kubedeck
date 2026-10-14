@@ -16,14 +16,17 @@ interface Props {
 }
 
 const DANGER: Partial<Record<ActionName, boolean>> = { delete: true, suspend: true };
-
-function copyFor(action: ActionName, isHelm: boolean) {
-  const key = (part: string) => `actionDialog.${isHelm && action === 'delete' ? 'uninstall' : action}.${part}` as MessageKey;
+function copyFor(action: ActionName, type: string) {
+  const variant = type === HELM_TYPE && action === 'delete' ? 'uninstall'
+    : type === 'cronjobs.batch' && (action === 'suspend' || action === 'resume') ? `${action}Cron`
+      : type === 'jobs.batch' && (action === 'suspend' || action === 'resume' || action === 'delete') ? `${action}Job`
+        : action;
+  const key = (part: string) => `actionDialog.${variant}.${part}` as MessageKey;
   return { title: t(key('title')), verb: t(key('verb')), explain: t(key('explain')), danger: !!DANGER[action] };
 }
 
 export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, onDone }: Props) {
-  const copy = copyFor(action, target.kind.type === HELM_TYPE);
+  const copy = copyFor(action, target.kind.type);
   const [replicas, setReplicas] = useState<number>(obj?.spec?.replicas ?? 1);
   const [typed, setTyped] = useState('');
   const [command, setCommand] = useState('');
@@ -31,7 +34,9 @@ export function ActionDialog({ ctx, action, target, obj, isProtected, onClose, o
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
-  const body = { ctx, ns: target.ns ?? '', type: target.kind.type, name: target.name, action, replicas };
+  // Fixed for the dialog's lifetime so the previewed command is the one that runs.
+  const [jobName] = useState(() => `${target.name.slice(0, 40)}-manual-${Date.now().toString(36)}`.replace(/[^a-z0-9.-]/g, '-'));
+  const body = { ctx, ns: target.ns ?? '', type: target.kind.type, name: target.name, action, replicas, ...(action === 'trigger' ? { jobName } : {}) };
 
   useEffect(() => {
     api.action({ ...body, dryRun: true })

@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import type { Cell, Column, Kind } from '../catalog';
+import { useEffect, useMemo, useState } from 'react';
+import { HELM_TYPE, type ActionName, type Cell, type Column, type Kind } from '../catalog';
 import { condition, podStatus, ratio, readyCount } from '../format';
 import { t } from '../i18n';
-import { Badge } from './ui';
+import { ACTION_META } from './DetailDrawer';
+import { Badge, Icon } from './ui';
 
 interface Props {
   kind: Kind;
@@ -12,6 +13,52 @@ interface Props {
   selectedKey?: string;
   /** `newTab`: Ctrl/Cmd+click or middle click. */
   onOpen: (item: any, newTab: boolean) => void;
+  /** Runs an action from the right-click menu. */
+  onAction?: (action: ActionName, item: any) => void;
+}
+
+/** Actions that apply to this row right now (suspend/resume depend on its state). */
+function actionsFor(kind: Kind, item: any): ActionName[] {
+  const suspended = item.spec?.suspend === true;
+  return (kind.actions ?? []).filter((a) => (a === 'suspend' ? !suspended : a === 'resume' ? suspended : true));
+}
+
+function ContextMenu({ kind, item, x, y, onPick, onClose }: {
+  kind: Kind; item: any; x: number; y: number; onPick: (a: ActionName) => void; onClose: () => void;
+}) {
+  const actions = actionsFor(kind, item);
+  useEffect(() => {
+    const close = () => onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('mousedown', close);
+    window.addEventListener('blur', close);
+    window.addEventListener('resize', close);
+    window.addEventListener('wheel', close, { passive: true });
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('wheel', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const left = Math.min(x, window.innerWidth - 200);
+  const top = Math.min(y, window.innerHeight - (actions.length * 34 + 16));
+  return (
+    <div className="ctx-menu" role="menu" style={{ left, top }} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
+      {actions.map((a) => {
+        const meta = ACTION_META[a];
+        const label = kind.type === HELM_TYPE && a === 'delete' ? t('action.uninstall') : t(meta.label);
+        return (
+          <button key={a} role="menuitem" className={`ctx-item${meta.danger ? ' danger' : ''}`} onClick={() => onPick(a)}>
+            <Icon name={meta.icon} size={14} /> {label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function rowKey(item: any): string {
@@ -47,7 +94,8 @@ function rowTone(kind: Kind, item: any): 'err' | 'done' | undefined {
   }
 }
 
-export function ResourceTable({ kind, items, filter, showNamespace, selectedKey, onOpen }: Props) {
+export function ResourceTable({ kind, items, filter, showNamespace, selectedKey, onOpen, onAction }: Props) {
+  const [menu, setMenu] = useState<{ item: any; x: number; y: number }>();
   const columns = useMemo(
     () => kind.columns.filter((c) => showNamespace || c.key !== 'ns'),
     [kind, showNamespace],
@@ -105,6 +153,11 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
                 onClick={(e) => onOpen(item, e.ctrlKey || e.metaKey)}
                 onMouseDown={(e) => e.button === 1 && e.preventDefault()}
                 onAuxClick={(e) => e.button === 1 && onOpen(item, true)}
+                onContextMenu={(e) => {
+                  if (!onAction || actionsFor(kind, item).length === 0) return;
+                  e.preventDefault();
+                  setMenu({ item, x: e.clientX, y: e.clientY });
+                }}
               >
                 {columns.map((c) => <td key={c.key} className={cls(c)}>{renderCell(c.get(item))}</td>)}
               </tr>
@@ -113,6 +166,13 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
         </tbody>
       </table>
       {rows.length === 0 && items.length > 0 && <div className="table-empty">{t('table.noMatch')}</div>}
+      {menu && onAction && (
+        <ContextMenu
+          kind={kind} item={menu.item} x={menu.x} y={menu.y}
+          onClose={() => setMenu(undefined)}
+          onPick={(a) => { setMenu(undefined); onAction(a, menu.item); }}
+        />
+      )}
     </div>
   );
 }

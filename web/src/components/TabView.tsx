@@ -297,6 +297,19 @@ export function TabView(props: Props) {
                     showNamespace={ns === ALL}
                     selectedKey={selectedKey}
                     onOpen={openItem}
+                    onAction={(action, item) => {
+                      const helmRow = kind.type === HELM_TYPE;
+                      setDialog({
+                        action,
+                        obj: item,
+                        target: {
+                          kind,
+                          name: helmRow ? item.name : item.metadata.name,
+                          ns: helmRow ? item.namespace : item.metadata.namespace,
+                          row: helmRow ? item : undefined,
+                        },
+                      });
+                    }}
                   />
                 )}
               </>

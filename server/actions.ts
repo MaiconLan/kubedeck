@@ -2,7 +2,10 @@ import { AppError, invalid } from './errors.js';
 import { checkName, formatCommand, helm, kubectl } from './kube.js';
 import { isProtected } from './settings.js';
 
-export type ActionName = 'restart' | 'scale' | 'delete' | 'reconcile' | 'suspend' | 'resume';
+export type ActionName = 'restart' | 'scale' | 'delete' | 'reconcile' | 'suspend' | 'resume' | 'trigger';
+
+const CRONJOB_TYPE = 'cronjobs.batch';
+const JOB_TYPE = 'jobs.batch';
 
 const FLUX_TYPES = [
   'kustomizations.kustomize.toolkit.fluxcd.io',
@@ -21,10 +24,11 @@ const HELM_TYPE = 'helm-releases';
 export const ALLOWED: Record<ActionName, string[]> = {
   restart: ['deployments.apps', 'statefulsets.apps', 'daemonsets.apps'],
   scale: ['deployments.apps', 'statefulsets.apps'],
-  delete: ['pods', HELM_TYPE],
+  delete: ['pods', JOB_TYPE, HELM_TYPE],
   reconcile: FLUX_TYPES,
-  suspend: FLUX_TYPES,
-  resume: FLUX_TYPES,
+  suspend: [...FLUX_TYPES, CRONJOB_TYPE, JOB_TYPE],
+  resume: [...FLUX_TYPES, CRONJOB_TYPE, JOB_TYPE],
+  trigger: [CRONJOB_TYPE],
 };
 
 export interface ActionRequest {
@@ -34,6 +38,8 @@ export interface ActionRequest {
   name: string;
   action: ActionName;
   replicas?: number;
+  /** Name of the Job created by `trigger`; the dialog picks it so the previewed command matches what runs. */
+  jobName?: string;
   /** Required on protected contexts: must equal `name`. */
   confirmName?: string;
   dryRun?: boolean;
@@ -58,6 +64,11 @@ function buildArgs(req: ActionRequest): string[] {
     case 'delete':
       if (req.type === HELM_TYPE) return ['uninstall', name, '-n', ns];
       return ['delete', target, '-n', ns, '--wait=false'];
+    case 'trigger': {
+      const jobName = checkName(req.jobName, 'jobName');
+      if (jobName.length > 63) throw invalid('invalidField', 'Invalid value for jobName.', { field: 'jobName' });
+      return ['create', 'job', jobName, `--from=cronjob/${name}`, '-n', ns];
+    }
     case 'reconcile':
       // Same annotation the flux CLI sets; no flux binary required.
       return ['annotate', target, '-n', ns, '--overwrite', `reconcile.fluxcd.io/requestedAt=${new Date().toISOString()}`];
