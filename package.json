@@ -1,6 +1,6 @@
 {
   "name": "kubedeck",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A fast, good-looking Kubernetes desktop app: tabs, split panes, live logs, diagnosis of failing pods, Flux and Helm, port-forward. Runs your own kubectl; nothing leaves your machine.",
   "type": "module",
   "license": "MIT",
@@ -70,6 +70,9 @@
       ],
       "icon": "build/icon.png"
     },
+    "portable": {
+      "artifactName": "KubeDeck_${version}_${os}_${arch}_portable.${ext}"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
@@ -91,11 +94,11 @@
       "icon": "build/icon.png",
       "maintainer": "KubeDeck contributors"
     },
-    "artifactName": "KubeDeck-${version}-${os}-${arch}.${ext}",
+    "artifactName": "KubeDeck_${version}_${os}_${arch}.${ext}",
     "publish": [
       {
         "provider": "github",
-        "releaseType": "draft"
+        "releaseType": "release"
       }
     ]
   },

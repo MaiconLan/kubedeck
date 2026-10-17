@@ -489,6 +489,27 @@ table.mini td { padding: 7px 8px; border-bottom: 1px solid var(--border-soft); v
 .log-line.l-debug .log-msg { color: #7d8490; }
 :root[data-theme='light'] .log-line.l-err .log-msg { color: var(--err); }
 :root[data-theme='light'] .log-line.l-warn .log-msg { color: var(--warn); }
+/* ANSI colors in logs: 0-7 normal, 8-15 bright. Theme-aware so dark-on-dark / light-on-light never happens. */
+.log-msg {
+  --a0: #6b7280; --a1: #ff6b6b; --a2: #5fd38d; --a3: #f5b83d; --a4: #6aa9ff; --a5: #c792ea; --a6: #4fd1c5; --a7: #d4d8de;
+  --a8: #8b93a1; --a9: #ff8a8a; --a10: #7ee8a7; --a11: #ffd166; --a12: #8dbdff; --a13: #dba9f5; --a14: #7fe3d9; --a15: #f4f6f8;
+}
+:root[data-theme='light'] .log-msg {
+  --a0: #4b5563; --a1: #c0392b; --a2: #1e8e4a; --a3: #9a6700; --a4: #1f5fbf; --a5: #8250c4; --a6: #0f7d7d; --a7: #6b7280;
+  --a8: #6b7280; --a9: #d9483a; --a10: #2a9d5c; --a11: #b07a00; --a12: #3b7ae0; --a13: #9a68d6; --a14: #1a9494; --a15: #374151;
+}
+.ansi-fg-0 { color: var(--a0); } .ansi-fg-1 { color: var(--a1); } .ansi-fg-2 { color: var(--a2); } .ansi-fg-3 { color: var(--a3); }
+.ansi-fg-4 { color: var(--a4); } .ansi-fg-5 { color: var(--a5); } .ansi-fg-6 { color: var(--a6); } .ansi-fg-7 { color: var(--a7); }
+.ansi-fg-8 { color: var(--a8); } .ansi-fg-9 { color: var(--a9); } .ansi-fg-10 { color: var(--a10); } .ansi-fg-11 { color: var(--a11); }
+.ansi-fg-12 { color: var(--a12); } .ansi-fg-13 { color: var(--a13); } .ansi-fg-14 { color: var(--a14); } .ansi-fg-15 { color: var(--a15); }
+.ansi-bg-0 { background: var(--a0); } .ansi-bg-1 { background: var(--a1); } .ansi-bg-2 { background: var(--a2); } .ansi-bg-3 { background: var(--a3); }
+.ansi-bg-4 { background: var(--a4); } .ansi-bg-5 { background: var(--a5); } .ansi-bg-6 { background: var(--a6); } .ansi-bg-7 { background: var(--a7); }
+.ansi-bg-8 { background: var(--a8); } .ansi-bg-9 { background: var(--a9); } .ansi-bg-10 { background: var(--a10); } .ansi-bg-11 { background: var(--a11); }
+.ansi-bg-12 { background: var(--a12); } .ansi-bg-13 { background: var(--a13); } .ansi-bg-14 { background: var(--a14); } .ansi-bg-15 { background: var(--a15); }
+.ansi-bold { font-weight: 700; }
+.ansi-dim { opacity: .65; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }
 .log-line mark, .code-line mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .log-line mark.active, .code-line mark.active { background: var(--mark-active); color: #1a1300; box-shadow: 0 0 0 1px var(--mark-active); }
 .log-empty { padding: 20px 16px; color: var(--text-3); }

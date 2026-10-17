@@ -1,14 +1,46 @@
 name: Release
 
+# Every push to main (i.e. a merged PR) releases the version in package.json,
+# unless a release for that version already exists. Bump the version in the PR
+# to ship a new release.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      needed: ${{ steps.v.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "Release v$version already exists; nothing to do."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            # Draft first; it is published once every platform has uploaded.
+            gh release create "v$version" --draft --target "$GITHUB_SHA" \
+              --title "v$version" --generate-notes
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   package:
+    needs: prepare
+    if: needs.prepare.outputs.needed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -22,9 +54,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Package and upload to a draft release
+      - name: Package and upload to the release
         run: npx electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Builds are not code-signed yet; skip looking for signing identities.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+  publish:
+    needs: [prepare, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "v${{ needs.prepare.outputs.version }}" --draft=false --repo "$GITHUB_REPOSITORY"
