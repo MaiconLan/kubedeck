@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { parseAnsi, stripAnsi, type AnsiStyle } from '../ansi';
 import { api, type ApiError } from '../api';
 import { t, type MessageKey } from '../i18n';
 import { FindNav, marked, useFind } from './find';
@@ -72,12 +73,12 @@ export function LogViewer({ ctx, ns, type, name, containers, initialPrevious = f
   });
 
   const q = query.trim().toLowerCase();
-  const visible = q && onlyMatches ? lines.current.filter((l) => l.toLowerCase().includes(q)) : lines.current;
-  // Search what is on screen (without the timestamp column), and stop following the tail while navigating.
-  const find = useFind(visible.map((l) => splitLine(l, timestamps).message), q, body, () => { stick.current = false; });
+  const visible = q && onlyMatches ? lines.current.filter((l) => stripAnsi(l).toLowerCase().includes(q)) : lines.current;
+  // Search what is on screen (without the timestamp column or color codes), and stop following the tail while navigating.
+  const find = useFind(visible.map((l) => stripAnsi(splitLine(l, timestamps).message)), q, body, () => { stick.current = false; });
 
   const download = () => {
-    const blob = new Blob([lines.current.join('\n')], { type: 'text/plain' });
+    const blob = new Blob([lines.current.map(stripAnsi).join('\n')], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${name}${container ? `-${container}` : ''}.log`;
@@ -196,13 +197,38 @@ interface LogLineProps {
 }
 
 function LogLine({ line, timestamps, qLen, starts, activeStart }: LogLineProps) {
-  const { ts, message } = splitLine(line, timestamps);
+  const { ts, message: raw } = splitLine(line, timestamps);
+  const { text: message, runs } = parseAnsi(raw);
   const level = lineLevel(message);
   return (
     <div className={`log-line${level ? ` l-${level}` : ''}`}>
       {timestamps && <span className="log-ts" title={ts}>{clock(ts)}</span>}
       {level ? <span className={`lvl lvl-${level}`}>{t(LEVEL_LABEL[level])}</span> : <span />}
-      <span className="log-msg">{marked(message, 0, starts, qLen, activeStart) || ' '}</span>
+      <span className="log-msg">
+        {message
+          ? runs.map((r) => {
+              const content = marked(r.text, r.offset, starts, qLen, activeStart);
+              return r.style ? <span key={r.offset} className={ansiClass(r.style)} style={ansiInline(r.style)}>{content}</span> : <span key={r.offset}>{content}</span>;
+            })
+          : ' '}
+      </span>
     </div>
   );
 }
+
+function ansiClass(s: AnsiStyle): string | undefined {
+  const c = [
+    s.fgIndex !== undefined && `ansi-fg-${s.fgIndex}`,
+    s.bgIndex !== undefined && `ansi-bg-${s.bgIndex}`,
+    s.bold && 'ansi-bold',
+    s.dim && 'ansi-dim',
+    s.italic && 'ansi-italic',
+    s.underline && 'ansi-underline',
+  ].filter(Boolean);
+  return c.length ? c.join(' ') : undefined;
+}
+
+function ansiInline(s: AnsiStyle): CSSProperties | undefined {
+  return s.fg || s.bg ? { color: s.fg, backgroundColor: s.bg } : undefined;
+}
+
