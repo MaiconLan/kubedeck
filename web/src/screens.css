@@ -101,6 +101,42 @@
 .bar-fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
 .bar-value { text-align: right; font-family: var(--font-mono); color: var(--text-2); font-size: 12px; }
 
+/* ---- tracked pods */
+.tracked { display: flex; flex-direction: column; gap: 18px; }
+.tracked-bar { display: flex; align-items: center; gap: 10px; }
+.seg-toggle { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border-soft); border-radius: 8px; }
+.seg-toggle .btn.on, .tracked-card .btn.on { background: var(--hover); color: var(--text); }
+.tracked-ctx { display: flex; flex-direction: column; gap: 12px; }
+.tracked-ctx-head { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.tracked-ns { display: flex; flex-direction: column; gap: 8px; padding-left: 12px; border-left: 2px solid var(--border-soft); }
+.tracked-ns-head { display: flex; align-items: center; gap: 8px; }
+.tracked-ns-name { font-weight: 500; }
+.tracked-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.tracked-card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; cursor: pointer; border-left: 3px solid var(--text-3); }
+.tracked-card:hover, .tracked-card.on { border-color: var(--accent); }
+.tracked-card.on { box-shadow: 0 0 0 3px var(--accent-soft); }
+.tracked-card.tone-ok { border-left-color: var(--ok); }
+.tracked-card.tone-warn { border-left-color: var(--warn); }
+.tracked-card.tone-err { border-left-color: var(--err); }
+.tracked-card.tone-info { border-left-color: var(--info); }
+.tracked-card.tracked-gone { cursor: default; border-style: dashed; opacity: .75; }
+.tc-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tc-head .btn { padding: 0 5px; }
+.tc-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-owner { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin: 4px 0 0; }
+.tc-field { min-width: 0; }
+.tc-field dt { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.tc-field dd { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.tc-menu {
+  position: absolute; z-index: 5; top: 40px; right: 10px; width: 230px; display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; cursor: default;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+}
+.tc-menu-title { font-weight: 600; }
+.tc-menu-item { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.tracked-missing { display: flex; align-items: center; gap: 10px; padding: 4px 8px; }
+
 /* ---- relationship map */
 .map-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .map-note { margin: 0; }

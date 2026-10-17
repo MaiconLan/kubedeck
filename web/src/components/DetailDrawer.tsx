@@ -31,6 +31,9 @@ interface Props {
   variant?: 'drawer' | 'page';
   onOpenNewTab?: () => void;
   onOpenNewWindow?: () => void;
+  /** Pods only: star state and toggle (undefined hides the star). */
+  tracked?: boolean;
+  onToggleTrack?: () => void;
 }
 
 export const ACTION_META: Record<ActionName, { label: MessageKey; icon: string; danger?: boolean }> = {
@@ -57,6 +60,12 @@ export function DetailDrawer(props: Props) {
           <CopyButton text={target.name} label={t('btn.copyName')} />
         </div>
         <div className="drawer-tools">
+          {target.kind.type === 'pods' && props.onToggleTrack && (
+            <button className={`btn btn-ghost btn-sm star-btn${props.tracked ? ' on' : ''}`} onClick={props.onToggleTrack}
+              title={t(props.tracked ? 'track.remove' : 'track.add')} aria-label={t(props.tracked ? 'track.remove' : 'track.add')}>
+              <Icon name="star" size={15} />
+            </button>
+          )}
           {onOpenNewTab && (
             <button className="btn btn-ghost btn-sm" onClick={onOpenNewTab} title={t('tabs.openInTab')}>
               <Icon name="tabNew" size={15} /><span className="label">{t('btn.openInTab')}</span>

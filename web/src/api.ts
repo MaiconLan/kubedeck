@@ -237,6 +237,16 @@ export interface Settings {
   contextColors: Record<string, string>;
   /** Saved tabs and panes of the main window (see tabs.ts). */
   layout?: unknown;
+  tracked: TrackedRef[];
+  trackedView?: 'cards' | 'list';
+}
+
+export interface TrackedRef {
+  ctx: string;
+  ns: string;
+  kind: 'Deployment' | 'StatefulSet' | 'DaemonSet' | 'Job' | 'Pod';
+  name: string;
+  fields?: string[];
 }
 
 export interface ApiResource {
