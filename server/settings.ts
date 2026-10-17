@@ -3,6 +3,16 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { demoEnabled } from './demo.js';
 
+export const TRACKED_KINDS = ['Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'Pod'] as const;
+
+export interface TrackedRef {
+  ctx: string;
+  ns: string;
+  kind: (typeof TRACKED_KINDS)[number];
+  name: string;
+  fields?: string[];
+}
+
 export interface Settings {
   protectedContexts: string[];
   refreshSeconds: number;
@@ -16,6 +26,9 @@ export interface Settings {
   contextColors: Record<string, string>;
   /** Saved tabs/panes of the main window; opaque to the server. */
   layout?: unknown;
+  /** Starred workloads/pods shown on the Tracked screen. */
+  tracked: TrackedRef[];
+  trackedView?: 'cards' | 'list';
 }
 
 const DEFAULTS: Settings = {
@@ -25,6 +38,7 @@ const DEFAULTS: Settings = {
   lastNamespace: {},
   knownNamespaces: {},
   contextColors: {},
+  tracked: [],
 };
 
 const DIR = join(homedir(), '.kubedeck');
@@ -39,6 +53,11 @@ const DEMO_SETTINGS: Settings = {
   language: 'en',
   lastContext: 'local-dev',
   lastNamespace: { 'local-dev': '*', staging: 'apps', 'prod-eu': 'apps' },
+  tracked: [
+    { ctx: 'local-dev', ns: 'apps', kind: 'Deployment', name: 'api' },
+    { ctx: 'local-dev', ns: 'apps', kind: 'StatefulSet', name: 'postgres' },
+    { ctx: 'staging', ns: 'apps', kind: 'Deployment', name: 'web' },
+  ],
 };
 
 export async function loadSettings(): Promise<Settings> {
@@ -77,11 +96,22 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
       if (Array.isArray(list)) next.knownNamespaces[ctx] = list.filter((n) => typeof n === 'string').slice(0, 100);
     }
   }
+  if (Array.isArray(patch.tracked)) next.tracked = patch.tracked.map(cleanTracked).filter((t): t is TrackedRef => !!t);
+  if (patch.trackedView === 'cards' || patch.trackedView === 'list') next.trackedView = patch.trackedView;
   cache = next;
   if (demoEnabled()) return next;
   await mkdir(DIR, { recursive: true });
   await writeFile(FILE, JSON.stringify(next, null, 2), 'utf8');
   return next;
+}
+
+function cleanTracked(t: any): TrackedRef | null {
+  if (!t || typeof t !== 'object') return null;
+  if (typeof t.ctx !== 'string' || typeof t.ns !== 'string' || typeof t.name !== 'string') return null;
+  if (!(TRACKED_KINDS as readonly string[]).includes(t.kind)) return null;
+  const ref: TrackedRef = { ctx: t.ctx, ns: t.ns, kind: t.kind, name: t.name };
+  if (Array.isArray(t.fields) && t.fields.length <= 12 && t.fields.every((f: any) => typeof f === 'string' && f.length <= 32)) ref.fields = t.fields;
+  return ref;
 }
 
 export async function isProtected(ctx: string): Promise<boolean> {

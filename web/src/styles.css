@@ -315,6 +315,11 @@ kbd {
 .grid td.grow { max-width: 520px; }
 .grid td.mono { font-size: 12px; }
 .grid .right { text-align: right; }
+.grid th.lead-cell, .grid td.lead-cell { width: 28px; padding: 0 0 0 8px; text-align: center; cursor: default; }
+.star-btn { color: var(--text-3); }
+.star-btn:hover { color: var(--accent); }
+.star-btn.on { color: var(--accent); }
+.star-btn.on svg { fill: currentColor; }
 .grid tbody tr { cursor: pointer; }
 .grid tbody tr:hover td { background: var(--hover); }
 .grid tbody tr.selected td { background: var(--selected); }
