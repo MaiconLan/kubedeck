@@ -1,15 +1,20 @@
 import {
-  age, condition, images, podStatus, ratio, readyCount, readyState, restarts, shortImage, ts, type Tone,
+  age, bytes, condition, cores, images, podStatus, ratio, readyCount, readyState, restarts, shortImage, ts, type Tone,
 } from './format';
 import { t, tryT, type MessageKey } from './i18n';
 
 /** `plain`: render the tone as colored text instead of a badge. */
-export type Cell = string | number | { text: string; tone?: Tone; title?: string; plain?: boolean };
+/** Mini bar under the text: `used` and `mark` are fractions (0-1) of the bar's full width. */
+export interface CellBar { used: number; mark?: number; tone: 'ok' | 'warm' | 'hot' }
+
+export type Cell = string | number | { text: string; tone?: Tone; title?: string; plain?: boolean; bar?: CellBar };
 
 export interface Column {
   key: string;
   /** Message key of the column header. */
   label: MessageKey;
+  /** Message key of a tooltip that explains the column. */
+  hint?: MessageKey;
   get: (o: any) => Cell;
   sort?: (o: any) => string | number;
   mono?: boolean;
@@ -79,6 +84,39 @@ const revisionCol = (path: (o: any) => string | undefined): Column => ({
     return { text: rev.length > 40 ? `${rev.slice(0, 40)}…` : rev, title: rev };
   },
 });
+
+/**
+ * Current usage of a pod, compared with what it asked for (request) and may use at most (limit).
+ * The bar fills toward the limit (or the request when there is no limit); the tick marks the request.
+ */
+export function usageCell(o: any, res: 'cpu' | 'memory'): Cell {
+  const used: number | undefined = o.usage?.[res];
+  if (used === undefined) return { text: '—', title: t('usage.unavailable') };
+  const fmt = res === 'cpu' ? cores : bytes;
+  const req: number = o.usage.requests?.[res] ?? 0;
+  const lim: number = o.usage.limits?.[res] ?? 0;
+  const pct = (v: number) => Math.round((used / v) * 100);
+
+  const tip = [t('usage.using', { value: fmt(used) })];
+  tip.push(req ? t('usage.request', { value: fmt(req), pct: pct(req) }) : t('usage.noRequest'));
+  tip.push(lim ? t('usage.limit', { value: fmt(lim), pct: pct(lim) }) : t('usage.noLimit'));
+
+  let tone: CellBar['tone'] = 'ok';
+  if (lim && used >= lim * 0.9) {
+    tone = 'hot';
+    tip.push(t(res === 'cpu' ? 'usage.nearLimit.cpu' : 'usage.nearLimit.memory'));
+  } else if (req && used > req) {
+    tone = 'warm';
+    tip.push(t('usage.aboveRequest'));
+  }
+
+  const max = lim || req;
+  return {
+    text: fmt(used) + (req ? ` · ${pct(req)}%` : ''),
+    title: tip.join('\n'),
+    bar: max ? { used: Math.min(1, used / max), mark: lim && req ? req / lim : undefined, tone } : undefined,
+  };
+}
 
 const workloadActions: ActionName[] = ['restart', 'scale'];
 const fluxActions: ActionName[] = ['reconcile', 'suspend', 'resume'];
@@ -157,6 +195,16 @@ export const KINDS: Kind[] = [
         key: 'restarts', label: 'col.restarts', align: 'right',
         get: (o) => { const n = restarts(o); return { text: String(n), tone: n > 5 ? 'err' : n > 0 ? 'warn' : 'muted', plain: true }; },
         sort: (o) => -restarts(o),
+      },
+      {
+        key: 'cpu', label: 'col.cpu', hint: 'col.cpu.hint', align: 'right', mono: true,
+        get: (o) => usageCell(o, 'cpu'),
+        sort: (o) => o.usage?.cpu ?? -1,
+      },
+      {
+        key: 'memory', label: 'col.memory', hint: 'col.memory.hint', align: 'right', mono: true,
+        get: (o) => usageCell(o, 'memory'),
+        sort: (o) => o.usage?.memory ?? -1,
       },
       { key: 'ip', label: 'col.ip', mono: true, get: (o) => o.status?.podIP ?? '' },
       { key: 'node', label: 'col.node', get: (o) => o.spec?.nodeName ?? '' },

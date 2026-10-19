@@ -18,6 +18,8 @@ export const TRACK_FIELDS: TrackField[] = [
   { id: 'status', label: 'col.status', get: podColumn('status') },
   { id: 'ready', label: 'col.ready', get: podColumn('ready') },
   { id: 'restarts', label: 'col.restarts', get: podColumn('restarts') },
+  { id: 'cpu', label: 'col.cpu', get: podColumn('cpu') },
+  { id: 'memory', label: 'col.memory', get: podColumn('memory') },
   { id: 'node', label: 'col.node', get: podColumn('node') },
   { id: 'ip', label: 'col.ip', get: podColumn('ip') },
   { id: 'age', label: 'col.age', get: podColumn('age') },

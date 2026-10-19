@@ -138,7 +138,7 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
           <tr>
             {leading && <th className="lead-cell" />}
             {columns.map((c) => (
-              <th key={c.key} className={`${c.align === 'right' ? 'right' : ''}${c.grow ? ' grow' : ''}`} onClick={() => toggleSort(c)}>
+              <th key={c.key} className={`${c.align === 'right' ? 'right' : ''}${c.grow ? ' grow' : ''}`} title={c.hint ? t(c.hint) : undefined} onClick={() => toggleSort(c)}>
                 {t(c.label)}
                 {sort.key === c.key && <span className="sort">{sort.dir === 1 ? '▲' : '▼'}</span>}
               </th>
@@ -189,5 +189,16 @@ export function renderCell(c: Cell) {
   if (typeof c !== 'object') return c;
   if (c.tone && c.plain) return <span className={`mono tone-${c.tone}`} title={c.title}>{c.text}</span>;
   if (c.tone) return <Badge tone={c.tone} title={c.title}>{c.text}</Badge>;
+  if (c.bar) {
+    return (
+      <div className="usage-cell" title={c.title}>
+        <span>{c.text}</span>
+        <div className="meter-track">
+          <div className={`meter-fill${c.bar.tone === 'ok' ? '' : ` ${c.bar.tone === 'warm' ? 'warm' : 'hot'}`}`} style={{ width: `${c.bar.used * 100}%` }} />
+          {c.bar.mark !== undefined && <div className="meter-req" style={{ left: `${c.bar.mark * 100}%` }} />}
+        </div>
+      </div>
+    );
+  }
   return <span title={c.title}>{c.text}</span>;
 }

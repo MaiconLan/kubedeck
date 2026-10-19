@@ -123,6 +123,22 @@ what to do. One click opens the previous logs, the YAML or the events. It recogn
 
 The dashboard's *Needs attention* list shows the short version of each diagnosis.
 
+### Pod CPU and memory
+
+<img src="docs/media/pods.gif" alt="The pods list with CPU and memory in use, a bar against each pod's request and limit, sorted by usage" width="100%">
+
+The pods list and each pod's Overview show the CPU and memory in use right now, next to what the pod asked for
+(its request) and the most it may use (its limit). The bar fills toward the limit and a tick marks the request;
+it turns amber above the request and red close to the limit. Hover a column header or a cell for a plain
+explanation of each number (needs `metrics-server`).
+
+### Favorite pods
+
+<img src="docs/media/favorites.gif" alt="Starring a pod, then the Tracked screen with cards, a field picker adding CPU and memory, and the list view" width="100%">
+
+Star a pod in Workloads › Pods or in its details and it shows up on the *Tracked* screen, across contexts and
+namespaces, as cards or as a list. Pick which facts each card shows, including CPU and memory.
+
 ### Live logs
 
 <img src="docs/media/logs.gif" alt="Streaming logs with level badges, timestamps and search" width="100%">

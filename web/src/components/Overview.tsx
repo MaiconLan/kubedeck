@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { kindByName } from '../catalog';
-import { age, dateTime, podStatus, readyState, type Tone } from '../format';
+import { kindByName, usageCell } from '../catalog';
+import { renderCell } from './ResourceTable';
+import { age, bytes, cores, dateTime, podStatus, readyState, type Tone } from '../format';
 import type { DiagAction } from '../diagnosis';
 import { t } from '../i18n';
 import { DiagnosisPanel } from './DiagnosisPanel';
@@ -30,6 +31,8 @@ export function Overview({ ctx, obj, onNavigate, onDiagnosisAction }: Props) {
         {obj.kind !== 'Pod' && ready.text !== '—' && <Fact label={t('ov.status')}><Badge tone={ready.tone} title={ready.message}>{ready.text}</Badge></Fact>}
         {obj.kind === 'Pod' && <Fact label={t('ov.node')}>{obj.spec?.nodeName}</Fact>}
         {obj.kind === 'Pod' && <Fact label={t('ov.ip')}>{obj.status?.podIP}</Fact>}
+        {obj.kind === 'Pod' && obj.usage && <Fact label="CPU"><UsageFact obj={obj} res="cpu" /></Fact>}
+        {obj.kind === 'Pod' && obj.usage && <Fact label={t('ov.memory')}><UsageFact obj={obj} res="memory" /></Fact>}
         {obj.spec?.replicas !== undefined && (
           <Fact label={t('ov.replicas')}>{t('ov.replicasValue', { ready: obj.status?.readyReplicas ?? 0, total: obj.spec.replicas })}</Fact>
         )}
@@ -87,6 +90,11 @@ function conditionTone(c: any): Tone {
   return 'warn';
 }
 
+function UsageFact({ obj, res }: { obj: any; res: 'cpu' | 'memory' }) {
+  const cell = usageCell(obj, res);
+  return typeof cell === 'object' ? renderCell(cell) : <>{cell}</>;
+}
+
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="fact">
@@ -130,6 +138,11 @@ function PodContainers({ pod }: { pod: any }) {
                 </div>
               )}
               <Resources c={c} />
+              {pod.usage?.containers?.[c.name] && (
+                <div className="small muted">
+                  {t('ov.usage', { cpu: cores(pod.usage.containers[c.name].cpu), memory: bytes(pod.usage.containers[c.name].memory) })}
+                </div>
+              )}
             </div>
           );
         })}
