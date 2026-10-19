@@ -234,3 +234,7 @@
 .diag-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .diag.compact .diag-body { padding-top: 10px; }
 .problem-detail { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+.usage-cell { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 96px; }
+.usage-cell .meter-track { flex: none; height: 5px; }
+.usage-cell .meter-req { top: -2px; bottom: -2px; }

@@ -1,5 +1,6 @@
 import { AppError, invalid } from './errors.js';
 import { checkName, checkType, kubectl, kubectlJson, nsArgs, run } from './kube.js';
+import { attachUsage, podUsage } from './podmetrics.js';
 
 // ---- contexts ---------------------------------------------------------------
 
@@ -134,6 +135,7 @@ export async function listObjects(ctx: string, type: string, ns: string | undefi
   const data = await kubectlJson(ctx, args, { timeoutMs: 30_000 });
   const items: any[] = data.items ?? [];
   for (const item of items) sanitize(item);
+  if (type === 'pods') attachUsage(items, await podUsage(ctx, ns));
   return { namespaced, items };
 }
 
@@ -168,6 +170,7 @@ export function getYaml(ctx: string, type: string, name: string, ns?: string) {
 export async function getJson(ctx: string, type: string, name: string, ns?: string) {
   const obj = await kubectlJson(ctx, ['get', ...objectArgs(type, name, ns)]);
   sanitize(obj);
+  if (type === 'pods' && ns) attachUsage([obj], await podUsage(ctx, ns, name));
   return obj;
 }
 

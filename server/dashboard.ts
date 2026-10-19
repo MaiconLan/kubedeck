@@ -1,6 +1,7 @@
 import { AppError } from './errors.js';
 import { checkName, kubectl, kubectlJson, nsArgs } from './kube.js';
 import { parseCpu, parseMemory } from './quantity.js';
+import { METRICS_API, rawJson } from './podmetrics.js';
 import { discover } from './resources.js';
 
 /** Each dashboard section loads independently, so one forbidden call doesn't blank the page. */
@@ -17,7 +18,6 @@ async function part<T>(work: () => Promise<T>): Promise<Part<T>> {
   }
 }
 
-const METRICS_API = '/apis/metrics.k8s.io/v1beta1';
 
 function resources(containers: any[] | undefined) {
   let cpu = 0;
@@ -80,10 +80,6 @@ function slimObject(o: any) {
     spec: { replicas: o.spec?.replicas, suspend: o.spec?.suspend },
     status: o.status ?? {},
   };
-}
-
-async function rawJson(ctx: string, path: string): Promise<any> {
-  return JSON.parse(await kubectl(ctx, ['get', '--raw', path]));
 }
 
 export async function dashboard(ctx: string, ns: string | undefined) {
