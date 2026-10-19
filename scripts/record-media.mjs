@@ -95,9 +95,12 @@ async function recordGif(page, name, steps) {
       if (wait > 0) await sleep(wait);
     }
   })();
-  await steps();
-  running = false;
-  await loop;
+  try {
+    await steps();
+  } finally {
+    running = false;
+    await loop.catch(() => {}); // a failed step closes the page; surface that error, not the screenshot's
+  }
   writeGif(join(OUT, `${name}.gif`), frames);
 }
 
@@ -160,6 +163,54 @@ const scenes = {
       await sleep(3000);
     });
     await page.screenshot({ path: join(OUT, 'diagnosis.png') });
+    await page.context().close();
+  },
+
+  async pods(browser) {
+    const page = await newPage(browser);
+    await click(page, page.locator('.side-item', { hasText: 'Pods' }));
+    await page.waitForSelector('tr .usage-cell', { timeout: 10_000 });
+    await sleep(1200);
+    await page.screenshot({ path: join(OUT, 'pods.png') });
+    await recordGif(page, 'pods', async () => {
+      await sleep(1200);
+      await moveTo(page, page.locator('tr', { hasText: 'api-7d9f8c6b5-x2kqp' }).locator('.usage-cell').first());
+      await sleep(1400);
+      await click(page, page.locator('th', { hasText: 'CPU' }));
+      await click(page, page.locator('th', { hasText: 'CPU' }));
+      await sleep(1800);
+      await click(page, page.locator('th', { hasText: 'Memory' }));
+      await click(page, page.locator('th', { hasText: 'Memory' }));
+      await sleep(1800);
+      await moveTo(page, page.locator('tr', { hasText: 'prometheus-0' }).locator('.usage-cell').nth(1));
+      await sleep(1600);
+    });
+    await page.context().close();
+  },
+
+  async tracked(browser) {
+    const page = await newPage(browser);
+    await recordGif(page, 'favorites', async () => {
+      await click(page, page.locator('.side-item', { hasText: 'Pods' }));
+      await sleep(900);
+      await click(page, page.locator('tr', { hasText: 'grafana' }).locator('.star-btn'));
+      await sleep(900);
+      await click(page, page.locator('.side-item', { hasText: 'Tracked' }));
+      await page.waitForSelector('.tracked-card', { timeout: 10_000 });
+      await sleep(1800);
+      await click(page, page.locator('.tracked-card', { hasText: 'postgres-0' }).locator('button[title="Card fields"]'));
+      await sleep(900);
+      await click(page, page.locator('.tc-menu-item', { hasText: 'CPU' }));
+      await click(page, page.locator('.tc-menu-item', { hasText: 'Memory' }));
+      await sleep(1600);
+      await page.keyboard.press('Escape');
+      await sleep(600);
+      await click(page, page.locator('.seg-toggle button', { hasText: 'List' }));
+      await sleep(2200);
+      await click(page, page.locator('.seg-toggle button', { hasText: 'Cards' }));
+      await sleep(1800);
+    });
+    await page.screenshot({ path: join(OUT, 'favorites.png') });
     await page.context().close();
   },
 
