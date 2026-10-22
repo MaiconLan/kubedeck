@@ -261,6 +261,7 @@ export const en = {
   'logs.reconnect': 'Reconnect',
   'logs.download': 'Download .log',
   'logs.empty': 'No log lines.',
+  'logs.waiting': 'Loading logs…',
   'logs.jumpBottom': 'Jump to end',
 
   // secrets
