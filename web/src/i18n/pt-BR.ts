@@ -262,6 +262,7 @@ export const ptBR: Messages = {
   'logs.reconnect': 'Reconectar',
   'logs.download': 'Baixar .log',
   'logs.empty': 'Nenhuma linha de log.',
+  'logs.waiting': 'Carregando logs…',
   'logs.jumpBottom': 'Ir para o fim',
 
   // secrets

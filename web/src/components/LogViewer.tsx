@@ -132,7 +132,10 @@ export function LogViewer({ ctx, ns, type, name, containers, initialPrevious = f
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
         }}
       >
-        {visible.length === 0 && status !== 'connecting' && !error && <div className="log-empty">{t('logs.empty')}</div>}
+        {/* The stream starts before kubectl prints anything, so "no lines" is only certain once it has ended. */}
+        {visible.length === 0 && !error && (lines.current.length === 0 && status !== 'ended'
+          ? <div className="log-empty log-waiting"><Spinner small /> {t('logs.waiting')}</div>
+          : <div className="log-empty">{t('logs.empty')}</div>)}
         {visible.map((line, i) => <LogLine key={i} line={line} timestamps={timestamps} qLen={q.length} starts={find.startsIn(i)} activeStart={find.activeIn(i)} />)}
       </div>
       {!stick.current && (

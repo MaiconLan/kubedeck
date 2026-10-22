@@ -513,6 +513,7 @@ table.mini td { padding: 7px 8px; border-bottom: 1px solid var(--border-soft); v
 .log-line mark, .code-line mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .log-line mark.active, .code-line mark.active { background: var(--mark-active); color: #1a1300; box-shadow: 0 0 0 1px var(--mark-active); }
 .log-empty { padding: 20px 16px; color: var(--text-3); }
+.log-waiting { display: flex; align-items: center; gap: 8px; }
 .log-warning { padding: 6px 16px; font-size: 12px; color: var(--warn); background: var(--warn-soft); white-space: pre-wrap; }
 .stream-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
 .stream-state .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
