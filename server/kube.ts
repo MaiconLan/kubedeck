@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { demoEnabled, demoRun, demoSpawn } from './demo.js';
 import { AppError, classifyStderr, invalid } from './errors.js';
+import { kubeProxy, ProxyHttpError, ProxyTimeout, ProxyUnavailable } from './kubeproxy.js';
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
@@ -144,6 +145,29 @@ export function kubectl(ctx: string, args: string[], opts?: RunOptions): Promise
 export async function kubectlJson<T = any>(ctx: string, args: string[], opts?: RunOptions): Promise<T> {
   const text = await kubectl(ctx, [...args, '-o', 'json'], opts);
   return JSON.parse(text) as T;
+}
+
+/**
+ * GET of an API path as JSON. Goes through the context's `kubectl proxy` (no process or auth cost per
+ * call); when the proxy cannot start or be reached it falls back to `kubectl get --raw`.
+ * The history shows the equivalent kubectl command.
+ */
+export async function kubectlGet<T = any>(ctx: string, path: string, opts: RunOptions = {}): Promise<T> {
+  const fallback = async () => JSON.parse(await kubectl(ctx, ['get', '--raw', path], opts)) as T;
+  if (demoEnabled()) return fallback();
+  const command = formatCommand('kubectl', ['--context', ctx, 'get', '--raw', path]);
+  const started = Date.now();
+  try {
+    const data = (await kubeProxy.apiGet(ctx, path, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)) as T;
+    record(command, false, true, started);
+    return data;
+  } catch (err) {
+    if (err instanceof ProxyUnavailable) return fallback();
+    record(command, false, false, started);
+    if (err instanceof ProxyTimeout) throw new AppError('timeout', 'timeout', 'The cluster took too long to respond.', { command });
+    if (err instanceof ProxyHttpError) throw classifyStderr(err.message, command);
+    throw err;
+  }
 }
 
 export function helm(ctx: string, args: string[], opts?: RunOptions): Promise<string> {
