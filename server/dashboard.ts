@@ -1,8 +1,9 @@
 import { AppError } from './errors.js';
-import { checkName, kubectl, kubectlJson, nsArgs } from './kube.js';
+import { demoEnabled } from './demo.js';
+import { checkName, kubectl, kubectlGet } from './kube.js';
 import { parseCpu, parseMemory } from './quantity.js';
 import { METRICS_API, rawJson } from './podmetrics.js';
-import { discover } from './resources.js';
+import { discover, listItems } from './resources.js';
 
 /** Each dashboard section loads independently, so one forbidden call doesn't blank the page. */
 type Part<T> = { ok: true; data: T } | { ok: false; error: unknown };
@@ -85,16 +86,14 @@ function slimObject(o: any) {
 export async function dashboard(ctx: string, ns: string | undefined) {
   const all = !ns || ns === '*';
   const metricsPods = all ? `${METRICS_API}/pods` : `${METRICS_API}/namespaces/${checkName(ns, 'namespace')}/pods`;
-  const discovery = await discover(ctx).catch(() => []);
-  const fluxTypes = ['kustomizations.kustomize.toolkit.fluxcd.io', 'helmreleases.helm.toolkit.fluxcd.io']
-    .filter((t) => discovery.some((r) => r.type === t));
 
   const [version, nodes, nodeMetrics, pods, podMetrics, workloads, flux, warnings] = await Promise.all([
-    part(async () => {
-      const v = JSON.parse(await kubectl(ctx, ['version', '-o', 'json']));
-      return String(v.serverVersion?.gitVersion ?? '');
-    }),
-    part(async () => ((await kubectlJson(ctx, ['get', 'nodes'])).items ?? []).map(slimNode)),
+    part(async () =>
+      demoEnabled()
+        ? String(JSON.parse(await kubectl(ctx, ['version', '-o', 'json'])).serverVersion?.gitVersion ?? '')
+        : String((await kubectlGet(ctx, '/version')).gitVersion ?? ''),
+    ),
+    part(async () => (await listItems(ctx, 'nodes', undefined)).map(slimNode)),
     part(async () =>
       ((await rawJson(ctx, `${METRICS_API}/nodes`)).items ?? []).map((m: any) => ({
         name: m.metadata?.name,
@@ -102,7 +101,7 @@ export async function dashboard(ctx: string, ns: string | undefined) {
         memory: parseMemory(m.usage?.memory),
       })),
     ),
-    part(async () => ((await kubectlJson(ctx, ['get', 'pods', ...nsArgs(ns)], { timeoutMs: 30_000 })).items ?? []).map(slimPod)),
+    part(async () => (await listItems(ctx, 'pods', ns)).map(slimPod)),
     part(async () =>
       ((await rawJson(ctx, metricsPods)).items ?? []).map((m: any) => {
         let cpu = 0;
@@ -114,14 +113,15 @@ export async function dashboard(ctx: string, ns: string | undefined) {
         return { name: m.metadata?.name, namespace: m.metadata?.namespace, cpu, memory };
       }),
     ),
-    part(async () =>
-      ((await kubectlJson(ctx, ['get', 'deployments.apps,statefulsets.apps,daemonsets.apps', ...nsArgs(ns)])).items ?? []).map(slimObject),
-    ),
-    fluxTypes.length
-      ? part(async () => ((await kubectlJson(ctx, ['get', fluxTypes.join(','), ...nsArgs(ns)])).items ?? []).map(slimObject))
-      : Promise.resolve(null),
+    part(async () => (await listItems(ctx, 'deployments.apps,statefulsets.apps,daemonsets.apps', ns)).map(slimObject)),
+    (async () => {
+      const discovery = await discover(ctx).catch(() => []);
+      const fluxTypes = ['kustomizations.kustomize.toolkit.fluxcd.io', 'helmreleases.helm.toolkit.fluxcd.io']
+        .filter((t) => discovery.some((r) => r.type === t));
+      return fluxTypes.length ? part(async () => (await listItems(ctx, fluxTypes.join(','), ns)).map(slimObject)) : null;
+    })(),
     part(async () => {
-      const items: any[] = (await kubectlJson(ctx, ['get', 'events', ...nsArgs(ns), '--field-selector', 'type=Warning'])).items ?? [];
+      const items: any[] = await listItems(ctx, 'events', ns, { fields: 'type=Warning' });
       const when = (e: any) => Date.parse(e.lastTimestamp || e.eventTime || e.metadata?.creationTimestamp || 0) || 0;
       return items
         .sort((a, b) => when(b) - when(a))
