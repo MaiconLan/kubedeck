@@ -1,4 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { delimiter, join } from 'node:path';
 
 /** The proxy cannot start, died or cannot be reached: the caller falls back to plain kubectl. */
 export class ProxyUnavailable extends Error {}
@@ -19,6 +22,13 @@ export class ProxyHttpError extends Error {
 const START_TIMEOUT_MS = 10_000;
 const IDLE_MS = 5 * 60_000;
 const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Throws on a non-2xx answer: 502/503/504 mean the proxy could not reach the cluster (kubectl then words the error), the rest are API errors. */
+export function checkStatus(status: number, body: string): void {
+  if (status >= 200 && status < 300) return;
+  if (status === 502 || status === 503 || status === 504) throw new ProxyUnavailable(httpErrorMessage(status, body));
+  throw new ProxyHttpError(status, httpErrorMessage(status, body));
+}
 
 /** The port of kubectl's `Starting to serve on 127.0.0.1:PORT` line, or undefined. */
 export function parseProxyPort(out: string): number | undefined {
@@ -55,18 +65,51 @@ export function httpErrorMessage(status: number, body: string): string {
 
 interface Entry {
   child: ChildProcess;
+  /** Kubeconfig signature at start; a different one means the proxy runs on stale credentials. */
+  config: string;
   base: Promise<string>;
   timer?: ReturnType<typeof setTimeout>;
   dropped?: boolean;
 }
 
-function spawnProxy(context: string): ChildProcess {
+/** Read-only: the proxy carries the user's credentials, so other local processes must not be able to write through it. */
+export function proxyArgs(context: string): string[] {
   // `--context=` keeps a context name from being read as an option; the address is loopback only.
-  return spawn('kubectl', [`--context=${context}`, 'proxy', '--port=0', '--address=127.0.0.1'], {
-    stdio: ['ignore', 'pipe', 'ignore'],
+  return [`--context=${context}`, 'proxy', '--port=0', '--address=127.0.0.1', '--reject-methods=POST,PUT,PATCH,DELETE'];
+}
+
+/** Size and mtime of every kubeconfig file kubectl reads, so an edit or a re-login is noticed. */
+export function kubeconfigSignature(): string {
+  const files = process.env.KUBECONFIG ? process.env.KUBECONFIG.split(delimiter).filter(Boolean) : [join(homedir(), '.kube', 'config')];
+  return files
+    .map((file) => {
+      try {
+        const st = statSync(file);
+        return `${file}:${st.size}:${st.mtimeMs}`;
+      } catch {
+        return `${file}:missing`;
+      }
+    })
+    .join('|');
+}
+
+const STDERR_TAIL = 2000;
+const stderrTails = new WeakMap<ChildProcess, () => string>();
+
+function spawnProxy(context: string): ChildProcess {
+  const child = spawn('kubectl', proxyArgs(context), {
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
     env: process.env,
   });
+  let tail = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    const text = chunk.toString('utf8');
+    tail = (tail + text).slice(-STDERR_TAIL);
+    console.error(`[kubectl proxy ${context}] ${text.trimEnd()}`);
+  });
+  stderrTails.set(child, () => tail);
+  return child;
 }
 
 function readPort(child: ChildProcess, timeoutMs: number): Promise<number> {
@@ -92,16 +135,24 @@ function readPort(child: ChildProcess, timeoutMs: number): Promise<number> {
       }
     };
     const onError = (e: Error) => fail(new ProxyUnavailable(String(e.message ?? e)));
-    const onClose = () => fail(new ProxyUnavailable('kubectl proxy exited before it started.'));
+    const onClose = () => {
+      const detail = stderrTails.get(child)?.().trim();
+      fail(new ProxyUnavailable(detail ? `kubectl proxy exited before it started: ${detail}` : 'kubectl proxy exited before it started.'));
+    };
     child.stdout?.on('data', onData);
     child.once('error', onError);
     child.once('close', onClose);
   });
 }
 
-/** One `kubectl proxy` child per context, started on first use, restarted after it dies, stopped when idle or on exit. */
+/** One `kubectl proxy` child per context, started on first use, restarted after it dies, restarted when the kubeconfig changes, stopped when idle or on exit. */
 export class KubeProxy {
   private readonly entries = new Map<string, Entry>();
+
+  constructor(
+    private readonly spawnChild: (context: string) => ChildProcess = spawnProxy,
+    private readonly signature: () => string = kubeconfigSignature,
+  ) {}
 
   private drop(context: string, entry: Entry): void {
     if (entry.dropped) return;
@@ -123,11 +174,17 @@ export class KubeProxy {
 
   /** The base URL of the context's proxy; concurrent callers share one start. */
   private acquire(context: string): Entry {
+    const config = this.signature();
     let entry = this.entries.get(context);
+    if (entry && entry.config !== config) {
+      this.drop(context, entry);
+      entry = undefined;
+    }
     if (!entry) {
-      const child = spawnProxy(context);
+      const child = this.spawnChild(context);
       const created: Entry = {
         child,
+        config,
         base: readPort(child, START_TIMEOUT_MS).then((port) => `http://127.0.0.1:${port}`),
       };
       entry = created;
@@ -155,7 +212,7 @@ export class KubeProxy {
       throw err instanceof ProxyUnavailable ? err : new ProxyUnavailable(String((err as Error)?.message ?? err));
     }
     this.touch(context, entry);
-    if (status < 200 || status >= 300) throw new ProxyHttpError(status, httpErrorMessage(status, body));
+    checkStatus(status, body);
     try {
       return JSON.parse(body);
     } catch {

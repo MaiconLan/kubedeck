@@ -190,7 +190,8 @@ export async function listItems(ctx: string, types: string, ns: string | undefin
 
 export async function listObjects(ctx: string, type: string, ns: string | undefined, filter: ListFilter = {}) {
   checkType(type);
-  const namespaced = await isNamespaced(ctx, type);
+  const res = await findResource(ctx, type);
+  const namespaced = res ? res.namespaced : await isNamespaced(ctx, type);
   const items = await listItems(ctx, type, ns, filter);
   for (const item of items) sanitize(item);
   if (type === 'pods') attachUsage(items, await podUsage(ctx, ns));
