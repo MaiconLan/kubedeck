@@ -153,6 +153,17 @@ export function TabView(props: Props) {
 
   const closeTarget = () => onNavigate({ target: undefined });
 
+  /** Target for a row of the list (Helm rows are plain objects, not Kubernetes resources). */
+  const rowTarget = (item: any): Target => {
+    const helmRow = kind.type === HELM_TYPE;
+    return {
+      kind,
+      name: helmRow ? item.name : item.metadata.name,
+      ns: helmRow ? item.namespace : item.metadata.namespace,
+      row: helmRow ? item : undefined,
+    };
+  };
+
   const toggleProtected = () => {
     save({
       protectedContexts: isProtected ? settings.protectedContexts.filter((c) => c !== ctx) : [...settings.protectedContexts, ctx],
@@ -362,20 +373,8 @@ export function TabView(props: Props) {
                     showNamespace={ns === ALL}
                     selectedKey={selectedKey}
                     onOpen={openItem}
-                    onAction={(action, item) => {
-                      const helmRow = kind.type === HELM_TYPE;
-                      setDialog({
-                        action,
-                        obj: item,
-                        ctx,
-                        target: {
-                          kind,
-                          name: helmRow ? item.name : item.metadata.name,
-                          ns: helmRow ? item.namespace : item.metadata.namespace,
-                          row: helmRow ? item : undefined,
-                        },
-                      });
-                    }}
+                    onAction={(action, item) => setDialog({ action, obj: item, ctx, target: rowTarget(item) })}
+                    onForward={(item) => setForwardFor({ obj: item, ctx, target: rowTarget(item) })}
                     leading={kind.type === 'pods' ? (pod) => {
                       const on = isTracked(settings.tracked, ctx, pod);
                       return (
