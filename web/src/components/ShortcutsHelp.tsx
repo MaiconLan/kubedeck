@@ -20,6 +20,7 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
     ['?', t('keys.help')],
     ['g f', t('keys.forwards')],
     ['g l', t('keys.commands')],
+    ['Ctrl+`', t('keys.terminal')],
   ];
   const tabs: Array<[string, string]> = [
     [isDesktop ? 'Ctrl+T' : 'g t', t('tabs.new')],

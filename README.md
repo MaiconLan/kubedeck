@@ -253,12 +253,14 @@ panel where you can open, copy or stop them; they stop when KubeDeck closes.
 
 ### Terminal
 
-**Terminal** in the sidebar opens your own shell (PowerShell on Windows, your `$SHELL` elsewhere) in a tab or a
-split pane. `kubectl` and `helm` run against the tab's context and namespace, so there is no `--context` or `-n`
-to type; pass your own to override them. Change the context or namespace at the top and the next command follows.
+The **>_ Terminal** button in the sidebar (or <kbd>Ctrl</kbd>+<kbd>`</kbd>) opens your own shell (PowerShell on Windows, your `$SHELL`
+elsewhere) in a panel at the bottom, like the command log. `kubectl` and `helm` run against the context and
+namespace of the focused tab, shown in the panel header (in red when the context is protected), so there is no
+`--context` or `-n` to type; pass your own to override them. Hiding the panel keeps the shells running; `+` opens
+another one.
 
-- **Shell in a pod:** the **Shell** button on a pod (or right-click → Shell) opens `kubectl exec -it` in a new tab,
-  in the pod's default container, with a picker when there are more.
+- **Shell in a pod:** the **Shell** button on a pod (or right-click → Shell) opens `kubectl exec -it` in the
+  terminal panel, in the pod's default container, with a picker when there are more.
 - **Protected contexts:** a `kubectl`/`helm` command that can change the cluster, and any pod shell, asks you to
   type the context name first. This covers commands that go through `kubectl` and `helm` by name. A full path
   to the binary, a script that calls the API directly, or a shell profile that puts another `kubectl` earlier in

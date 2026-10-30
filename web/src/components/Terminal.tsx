@@ -92,6 +92,8 @@ export function Terminal({ ctx, ns, visible, focused, pod }: Props) {
 
     // Copy and paste like other terminals: Ctrl+Shift+C/V, and Ctrl+C copies when text is selected.
     term.attachCustomKeyEventHandler((e) => {
+      // Ctrl+` belongs to the app (shows/hides the terminal panel).
+      if (e.ctrlKey && e.key === '`') return false;
       if (e.type !== 'keydown' || isMac) return true;
       const key = e.key.toLowerCase();
       if (e.ctrlKey && (key === 'c') && (e.shiftKey || term.hasSelection())) {
@@ -266,7 +268,6 @@ export function Terminal({ ctx, ns, visible, focused, pod }: Props) {
         )}
         {!pty && status === 'ready' && <Badge tone="warn" title={t('term.simpleHint')}>{t('term.simple')}</Badge>}
         <span className="spacer" />
-        {!pod && <span className="muted small">{t('term.scope', { ctx, ns: ns === '*' ? t('content.allNamespaces') : ns })}</span>}
         {status === 'connecting' && <Spinner small />}
         <button className="btn btn-ghost btn-sm" onClick={() => setRun((n) => n + 1)} title={t('term.restart')}>
           <Icon name="restart" size={14} /><span className="label">{t('term.restart')}</span>

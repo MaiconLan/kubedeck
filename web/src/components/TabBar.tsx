@@ -1,5 +1,5 @@
 import { useState, type DragEvent } from 'react';
-import { kindLabel, TERMINAL_TYPE } from '../catalog';
+import { kindLabel } from '../catalog';
 import { t } from '../i18n';
 import type { Pane, Tab } from '../tabs';
 import { kindForType } from './TabView';
@@ -25,12 +25,6 @@ const DRAG_TYPE = 'application/x-kubedeck-tab';
 export function tabTitle(tab: Tab): { title: string; tooltip: string } {
   const { route } = tab;
   const kind = kindForType(route.type);
-  if (route.type === TERMINAL_TYPE && route.target) {
-    return {
-      title: route.target.name,
-      tooltip: `${t('term.podShell')}: pod/${route.target.name}\n${route.ctx}${route.target.ns ? ` · ${route.target.ns}` : ''}`,
-    };
-  }
   if (tab.detail && route.target) {
     const targetKind = kindForType(route.target.type);
     return {
