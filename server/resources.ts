@@ -1,5 +1,6 @@
+import { demoEnabled } from './demo.js';
 import { AppError, invalid } from './errors.js';
-import { checkName, checkType, kubectl, kubectlJson, nsArgs, run } from './kube.js';
+import { checkName, checkType, kubectl, kubectlGet, kubectlJson, nsArgs, run } from './kube.js';
 import { attachUsage, podUsage } from './podmetrics.js';
 
 // ---- contexts ---------------------------------------------------------------
@@ -44,8 +45,8 @@ export async function checkContext(value: unknown): Promise<string> {
 
 export async function listNamespaces(ctx: string): Promise<{ forbidden: boolean; names: string[] }> {
   try {
-    const out = await kubectl(ctx, ['get', 'namespaces', '-o', 'jsonpath={.items[*].metadata.name}']);
-    return { forbidden: false, names: out.split(/\s+/).filter(Boolean).sort() };
+    const items = await listItems(ctx, 'namespaces', undefined, {}, 20_000);
+    return { forbidden: false, names: items.map((n: any) => String(n.metadata?.name ?? '')).filter(Boolean).sort() };
   } catch (err) {
     if (err instanceof AppError && err.kind === 'forbidden') return { forbidden: true, names: [] };
     throw err;
@@ -126,14 +127,72 @@ export interface ListFilter {
   fields?: string;
 }
 
+const FULL_VERBS = ['get', 'list'];
+const rt = (name: string, group: string, version: string, kind: string, namespaced: boolean): ApiResource => ({
+  name, group, version, kind, namespaced, shortNames: [], verbs: FULL_VERBS, type: group ? `${name}.${group}` : name,
+});
+/** Types the hot screens read, known without discovery (which is a slow `kubectl api-resources`). */
+const BUILTIN: ApiResource[] = [
+  rt('pods', '', 'v1', 'Pod', true),
+  rt('nodes', '', 'v1', 'Node', false),
+  rt('namespaces', '', 'v1', 'Namespace', false),
+  rt('events', '', 'v1', 'Event', true),
+  rt('deployments', 'apps', 'v1', 'Deployment', true),
+  rt('statefulsets', 'apps', 'v1', 'StatefulSet', true),
+  rt('daemonsets', 'apps', 'v1', 'DaemonSet', true),
+];
+
+async function findResource(ctx: string, type: string): Promise<ApiResource | undefined> {
+  if (demoEnabled()) return undefined;
+  const builtin = BUILTIN.find((r) => r.type === type);
+  if (builtin) return builtin;
+  const known = await discover(ctx).catch(() => [] as ApiResource[]);
+  return known.find((r) => r.type === type) ?? known.find((r) => r.name === type);
+}
+
+const apiVersionOf = (res: ApiResource) => (res.group ? `${res.group}/${res.version}` : res.version);
+
+/** API path of a list (no `name`) or one object. An empty or "*" namespace lists across namespaces. */
+export function apiPath(res: ApiResource, o: { ns?: string; name?: string; labels?: string; fields?: string }): string {
+  const base = res.group ? `/apis/${res.group}/${res.version}` : `/api/${res.version}`;
+  const scope = res.namespaced && o.ns && o.ns !== '*' ? `/namespaces/${checkName(o.ns, 'namespace')}` : '';
+  const query = new URLSearchParams();
+  if (o.labels) query.set('labelSelector', o.labels);
+  if (o.fields) query.set('fieldSelector', o.fields);
+  const qs = query.size ? `?${query}` : '';
+  return `${base}${scope}/${res.name}${o.name ? `/${checkName(o.name, 'name')}` : ''}${qs}`;
+}
+
+/**
+ * Items of `type`, read through the API (kubectl proxy) when discovery knows the type, else with
+ * `kubectl get`. A REST list leaves `kind`/`apiVersion` off its items, so they are filled in.
+ * Every type of a comma-separated list is read separately and merged.
+ */
+export async function listItems(ctx: string, types: string, ns: string | undefined, filter: ListFilter = {}, timeoutMs = 30_000): Promise<any[]> {
+  const labels = filter.labels ? checkSelector(filter.labels, 'selector') : undefined;
+  const fields = filter.fields ? checkSelector(filter.fields, 'selector') : undefined;
+  const one = async (type: string): Promise<any[]> => {
+    checkType(type);
+    const res = await findResource(ctx, type);
+    if (!res || !res.verbs.includes('list')) {
+      const namespaced = res ? res.namespaced : await isNamespaced(ctx, type);
+      const args = ['get', type, ...(namespaced ? nsArgs(ns) : [])];
+      if (labels) args.push('-l', labels);
+      if (fields) args.push('--field-selector', fields);
+      return (await kubectlJson(ctx, args, { timeoutMs })).items ?? [];
+    }
+    const data = await kubectlGet(ctx, apiPath(res, { ns, labels, fields }), { timeoutMs });
+    return (data.items ?? []).map((item: any) => ({ apiVersion: apiVersionOf(res), kind: res.kind, ...item }));
+  };
+  const lists = await Promise.all(types.split(',').map(one));
+  return lists.flat();
+}
+
 export async function listObjects(ctx: string, type: string, ns: string | undefined, filter: ListFilter = {}) {
   checkType(type);
-  const namespaced = await isNamespaced(ctx, type);
-  const args = ['get', type, ...(namespaced ? nsArgs(ns) : [])];
-  if (filter.labels) args.push('-l', checkSelector(filter.labels, 'selector'));
-  if (filter.fields) args.push('--field-selector', checkSelector(filter.fields, 'selector'));
-  const data = await kubectlJson(ctx, args, { timeoutMs: 30_000 });
-  const items: any[] = data.items ?? [];
+  const res = await findResource(ctx, type);
+  const namespaced = res ? res.namespaced : await isNamespaced(ctx, type);
+  const items = await listItems(ctx, type, ns, filter);
   for (const item of items) sanitize(item);
   if (type === 'pods') attachUsage(items, await podUsage(ctx, ns));
   return { namespaced, items };
@@ -167,8 +226,17 @@ export function getYaml(ctx: string, type: string, name: string, ns?: string) {
   return kubectl(ctx, ['get', ...objectArgs(type, name, ns), '-o', 'yaml']);
 }
 
+/** One object, read through the API (kubectl proxy) when discovery knows the type, else with `kubectl get`. */
+async function getItem(ctx: string, type: string, name: string, ns?: string): Promise<any> {
+  const args = objectArgs(type, name, ns);
+  const res = await findResource(ctx, type);
+  if (!res || !res.verbs.includes('get') || (res.namespaced && !ns)) return kubectlJson(ctx, ['get', ...args]);
+  const obj = await kubectlGet(ctx, apiPath(res, { ns, name }));
+  return { apiVersion: apiVersionOf(res), kind: res.kind, ...obj };
+}
+
 export async function getJson(ctx: string, type: string, name: string, ns?: string) {
-  const obj = await kubectlJson(ctx, ['get', ...objectArgs(type, name, ns)]);
+  const obj = await getItem(ctx, type, name, ns);
   sanitize(obj);
   if (type === 'pods' && ns) attachUsage([obj], await podUsage(ctx, ns, name));
   return obj;
@@ -182,11 +250,8 @@ export async function eventsFor(ctx: string, kind: string, name: string, ns?: st
   checkName(kind, 'kind');
   checkName(name, 'name');
   const selector = `involvedObject.name=${name},involvedObject.kind=${kind}`;
-  const data = await kubectlJson(ctx, [
-    'get', 'events', ...(ns ? ['-n', checkName(ns, 'namespace')] : ['--all-namespaces']),
-    '--field-selector', selector,
-  ]);
-  return (data.items ?? []).sort((a: any, b: any) => eventTime(b) - eventTime(a));
+  const items = await listItems(ctx, 'events', ns, { fields: selector }, 20_000);
+  return items.sort((a: any, b: any) => eventTime(b) - eventTime(a));
 }
 
 function eventTime(e: any): number {

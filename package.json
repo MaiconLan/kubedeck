@@ -24,6 +24,7 @@
     "dev:server": "tsx watch server/cli.ts --dev",
     "dev:web": "vite",
     "dev:desktop": "npm run build:node && electron . --dev",
+    "test": "tsx --test server/*.test.ts",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p web/tsconfig.json --noEmit",
     "demo": "npm run build && node bin/kubedeck.js --demo",
     "desktop:demo": "npm run build && electron . --demo",

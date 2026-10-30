@@ -1,4 +1,4 @@
-import { kubectl, checkName } from './kube.js';
+import { kubectlGet, checkName } from './kube.js';
 import { parseCpu, parseMemory } from './quantity.js';
 
 export const METRICS_API = '/apis/metrics.k8s.io/v1beta1';
@@ -12,7 +12,7 @@ export interface PodUsage {
 }
 
 export async function rawJson(ctx: string, path: string): Promise<any> {
-  return JSON.parse(await kubectl(ctx, ['get', '--raw', path]));
+  return kubectlGet(ctx, path);
 }
 
 /**
