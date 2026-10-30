@@ -39,6 +39,21 @@ interface Forward {
 
 const forwards = new Map<string, Forward>();
 
+/**
+ * Inside a container, forwards must listen on all interfaces and use ports the host publishes:
+ * KUBEDECK_FORWARD_ADDRESS=0.0.0.0 and KUBEDECK_FORWARD_PORTS=7500-7519.
+ */
+const FORWARD_ADDRESS = process.env.KUBEDECK_FORWARD_ADDRESS || '127.0.0.1';
+const FORWARD_PORTS = parseRange(process.env.KUBEDECK_FORWARD_PORTS);
+
+function parseRange(value: string | undefined): { from: number; to: number } | undefined {
+  const m = value?.trim().match(/^(\d{1,5})(?:-(\d{1,5}))?$/);
+  if (!m) return undefined;
+  const from = Number(m[1]);
+  const to = Number(m[2] ?? m[1]);
+  return from >= 1 && to <= 65535 && from <= to ? { from, to } : undefined;
+}
+
 function publicView(f: Forward) {
   const { child: _child, ...rest } = f;
   return rest;
@@ -48,12 +63,20 @@ export function listForwards() {
   return [...forwards.values()].map(publicView);
 }
 
-function freePort(): Promise<number> {
+async function freePort(): Promise<number> {
+  if (FORWARD_PORTS) {
+    for (let p = FORWARD_PORTS.from; p <= FORWARD_PORTS.to; p++) {
+      if (await portAvailable(p)) return p;
+    }
+    throw new AppError('invalid', 'noFreePort', `No free local port in ${FORWARD_PORTS.from}-${FORWARD_PORTS.to}.`, {
+      params: { from: FORWARD_PORTS.from, to: FORWARD_PORTS.to },
+    });
+  }
   return new Promise((resolve, reject) => {
     const srv = createServer();
     srv.unref();
     srv.on('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
+    srv.listen(0, FORWARD_ADDRESS, () => {
       const { port } = srv.address() as AddressInfo;
       srv.close(() => resolve(port));
     });
@@ -65,7 +88,7 @@ function portAvailable(port: number): Promise<boolean> {
     const srv = createServer();
     srv.unref();
     srv.once('error', () => resolve(false));
-    srv.listen(port, '127.0.0.1', () => srv.close(() => resolve(true)));
+    srv.listen(port, FORWARD_ADDRESS, () => srv.close(() => resolve(true)));
   });
 }
 
@@ -83,14 +106,16 @@ export async function startForward(req: ForwardRequest) {
   const remotePort = checkPort(req.remotePort, false);
   let localPort = checkPort(req.localPort, true);
 
-  if (localPort === 0) {
+  // Ports outside the published range would not reach the host: pick one inside it instead.
+  const outside = FORWARD_PORTS && (localPort < FORWARD_PORTS.from || localPort > FORWARD_PORTS.to);
+  if (localPort === 0 || outside) {
     localPort = await freePort();
   } else if (!(await portAvailable(localPort))) {
     throw new AppError('invalid', 'portInUse', `Local port ${localPort} is already in use.`, { params: { port: localPort } });
   }
 
   const { child, command } = spawnKubectl(req.ctx, [
-    'port-forward', '-n', ns, `${kind}/${name}`, `${localPort}:${remotePort}`, '--address', '127.0.0.1',
+    'port-forward', '-n', ns, `${kind}/${name}`, `${localPort}:${remotePort}`, '--address', FORWARD_ADDRESS,
   ]);
 
   const fwd: Forward = {

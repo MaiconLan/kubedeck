@@ -22,6 +22,11 @@ export function commandHistory(): CommandEntry[] {
   return history.slice().reverse();
 }
 
+/** Adds a command run outside `run()` (e.g. typed in the terminal) to the command log. */
+export function recordCommand(command: string, write: boolean, ok: boolean, started: number) {
+  record(command, write, ok, started);
+}
+
 function record(command: string, write: boolean, ok: boolean, started: number) {
   history.push({ id: nextId++, at: new Date().toISOString(), command, write, ok, ms: Date.now() - started });
   if (history.length > 400) history.splice(0, history.length - 400);

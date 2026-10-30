@@ -1,0 +1,27 @@
+# Run KubeDeck in a container: `docker compose up -d` (or `podman compose up -d`),
+# then open the URL printed by `docker compose logs kubedeck`.
+# See "Docker and Podman" in the README for Podman, SELinux and clusters on localhost.
+services:
+  kubedeck:
+    build: .
+    image: kubedeck:local
+    init: true
+    restart: unless-stopped
+    ports:
+      # Only this machine can reach KubeDeck and its port-forwards.
+      - "127.0.0.1:7420:7420"
+      - "127.0.0.1:7500-7519:7500-7519"
+    volumes:
+      # The whole folder, read-only: editors and `kubectl config` replace the file, which a single-file
+      # mount would not see. Set KUBE_DIR to use another folder.
+      - ${KUBE_DIR:-~/.kube}:/kube:ro
+      # Settings (protected contexts, favorites, layout) survive restarts.
+      - kubedeck-data:/data
+    environment:
+      KUBECONFIG: /kube/${KUBECONFIG_NAME:-config}
+    extra_hosts:
+      # Lets kubeconfigs reach clusters on the host (k3d, kind, minikube); see the README.
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  kubedeck-data:

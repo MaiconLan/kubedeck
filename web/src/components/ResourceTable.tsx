@@ -15,6 +15,10 @@ interface Props {
   onOpen: (item: any, newTab: boolean) => void;
   /** Runs an action from the right-click menu. */
   onAction?: (action: ActionName, item: any) => void;
+  /** Opens the port-forward dialog from the right-click menu (kinds with `forward`). */
+  onForward?: (item: any) => void;
+  /** Opens a shell inside the pod from the right-click menu. */
+  onShell?: (item: any) => void;
   /** Renders a narrow first column (e.g. a star button). */
   leading?: (item: any) => ReactNode;
 }
@@ -25,10 +29,18 @@ function actionsFor(kind: Kind, item: any): ActionName[] {
   return (kind.actions ?? []).filter((a) => (a === 'suspend' ? !suspended : a === 'resume' ? suspended : true));
 }
 
-function ContextMenu({ kind, item, x, y, onPick, onClose }: {
-  kind: Kind; item: any; x: number; y: number; onPick: (a: ActionName) => void; onClose: () => void;
+interface MenuExtra {
+  key: string;
+  icon: string;
+  label: string;
+  run: () => void;
+}
+
+function ContextMenu({ kind, item, x, y, onPick, extras, onClose }: {
+  kind: Kind; item: any; x: number; y: number; onPick: (a: ActionName) => void; extras: MenuExtra[]; onClose: () => void;
 }) {
   const actions = actionsFor(kind, item);
+  const entries = actions.length + extras.length;
   useEffect(() => {
     const close = () => onClose();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -47,9 +59,14 @@ function ContextMenu({ kind, item, x, y, onPick, onClose }: {
   }, [onClose]);
 
   const left = Math.min(x, window.innerWidth - 200);
-  const top = Math.min(y, window.innerHeight - (actions.length * 34 + 16));
+  const top = Math.min(y, window.innerHeight - (entries * 34 + 16));
   return (
     <div className="ctx-menu" role="menu" style={{ left, top }} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
+      {extras.map((x) => (
+        <button key={x.key} role="menuitem" className="ctx-item" onClick={x.run}>
+          <Icon name={x.icon} size={14} /> {x.label}
+        </button>
+      ))}
       {actions.map((a) => {
         const meta = ACTION_META[a];
         const label = kind.type === HELM_TYPE && a === 'delete' ? t('action.uninstall') : t(meta.label);
@@ -96,8 +113,17 @@ function rowTone(kind: Kind, item: any): 'err' | 'done' | undefined {
   }
 }
 
-export function ResourceTable({ kind, items, filter, showNamespace, selectedKey, onOpen, onAction, leading }: Props) {
+export function ResourceTable({ kind, items, filter, showNamespace, selectedKey, onOpen, onAction, onForward, onShell, leading }: Props) {
   const [menu, setMenu] = useState<{ item: any; x: number; y: number }>();
+
+  /** Menu entries besides the kind's actions: the same ones the detail view offers. */
+  const extrasFor = (item: any): MenuExtra[] => {
+    const close = (fn: (item: any) => void) => () => { setMenu(undefined); fn(item); };
+    return [
+      ...(onShell ? [{ key: 'shell', icon: 'terminal', label: t('term.shellButton'), run: close(onShell) }] : []),
+      ...(onForward && kind.forward ? [{ key: 'forward', icon: 'plug', label: t('pf.button'), run: close(onForward) }] : []),
+    ];
+  };
   const columns = useMemo(
     () => kind.columns.filter((c) => showNamespace || c.key !== 'ns'),
     [kind, showNamespace],
@@ -157,7 +183,7 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
                 onMouseDown={(e) => e.button === 1 && e.preventDefault()}
                 onAuxClick={(e) => e.button === 1 && onOpen(item, true)}
                 onContextMenu={(e) => {
-                  if (!onAction || actionsFor(kind, item).length === 0) return;
+                  if ((!onAction || actionsFor(kind, item).length === 0) && extrasFor(item).length === 0) return;
                   e.preventDefault();
                   setMenu({ item, x: e.clientX, y: e.clientY });
                 }}
@@ -170,11 +196,12 @@ export function ResourceTable({ kind, items, filter, showNamespace, selectedKey,
         </tbody>
       </table>
       {rows.length === 0 && items.length > 0 && <div className="table-empty">{t('table.noMatch')}</div>}
-      {menu && onAction && (
+      {menu && (
         <ContextMenu
           kind={kind} item={menu.item} x={menu.x} y={menu.y}
           onClose={() => setMenu(undefined)}
-          onPick={(a) => { setMenu(undefined); onAction(a, menu.item); }}
+          onPick={(a) => { setMenu(undefined); onAction?.(a, menu.item); }}
+          extras={extrasFor(menu.item)}
         />
       )}
     </div>

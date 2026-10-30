@@ -100,8 +100,90 @@ npm link                 # installs the "kubedeck" command
 kubedeck                 # opens http://127.0.0.1:<port>/?t=<token>
 ```
 
-Options: `--port 7420`, `--no-open`, `--demo`. After pulling new code, run `npm run build` again and restart
-`kubedeck`. Having trouble on Windows? See [Troubleshooting](#troubleshooting).
+Options: `--port 7420`, `--host 127.0.0.1`, `--no-open`, `--demo`. After pulling new code, run `npm run build`
+again and restart `kubedeck`. Having trouble on Windows? See [Troubleshooting](#troubleshooting).
+
+### Docker and Podman
+
+The image has KubeDeck, `kubectl` and `helm`. It reads your `~/.kube` folder (read-only) and is reachable only
+from your own machine.
+
+```bash
+docker compose up -d --build
+docker compose logs kubedeck      # copy the "KubeDeck running at http://127.0.0.1:7420/?t=..." URL
+```
+
+With Podman, use `podman compose` (or `podman-compose`) with the same commands. The token changes on every
+restart, so look at the logs again after `docker compose restart`.
+
+| What | Where |
+|---|---|
+| UI | `http://127.0.0.1:7420/?t=<token>` |
+| Port-forwards | local ports `7500-7519` (a port outside this range is replaced by a free one inside it) |
+| Settings | the `kubedeck-data` volume (`/data` in the container) |
+| Kubeconfig | `~/.kube/config`; change with `KUBE_DIR=/other/folder` and `KUBECONFIG_NAME=file` |
+
+Things to know:
+
+- **Clusters on `localhost` (k3d, kind, minikube, Docker Desktop):** `127.0.0.1` inside the container is the
+  container, not your machine. Point the context to `host.docker.internal` (Docker) or
+  `host.containers.internal` (Podman) instead, with a copy of the kubeconfig set via `KUBE_DIR`. The cluster
+  certificate may not list that name: add `tls-server-name: localhost` to the cluster entry. On Linux you can
+  instead use the host network, with an override file:
+
+  ```yaml
+  # docker-compose.override.yml
+  services:
+    kubedeck:
+      network_mode: host
+      ports: !reset []
+      extra_hosts: !reset []
+      environment:
+        KUBEDECK_HOST: 127.0.0.1
+        KUBEDECK_FORWARD_ADDRESS: 127.0.0.1
+  ```
+
+- **Auth plugins:** the image has no `aws`, `gke-gcloud-auth-plugin`, `kubelogin` or `az`, so contexts that use
+  them fail to sign in. Build your own image on top of it with the plugin you need, for example:
+
+  ```dockerfile
+  FROM kubedeck:local
+  USER root
+  RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
+   && curl -fsSLo /tmp/k.zip https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip \
+   && unzip -j /tmp/k.zip '*/kubelogin' -d /usr/local/bin && rm /tmp/k.zip
+  USER node
+  ```
+
+  Tokens from `kubelogin` with `azurecli` still need `az` and its login; prefer a service principal or
+  `spn`/`workloadidentity` login modes in a container.
+- **Terminal:** the shell runs inside the container, with its `kubectl`, `helm` and the mounted kubeconfig.
+- **Read-only kubeconfig:** "Add cluster" (AKS) writes to the kubeconfig and fails in the container. Add the
+  context on your machine and restart the container.
+- **Docker on Linux:** the container runs as user `1000`. If your user has another id, add
+  `user: "<your uid>:<your gid>"` to the service so it can read `~/.kube/config`.
+- **Podman rootless and SELinux:** add an override so the container runs as your user and may read the folder:
+
+  ```yaml
+  # docker-compose.override.yml
+  services:
+    kubedeck:
+      userns_mode: keep-id
+      volumes:
+        - ~/.kube:/kube:ro,z
+  ```
+
+  If `host-gateway` is rejected by an older Podman, remove `extra_hosts`: Podman already provides
+  `host.containers.internal`.
+- **Without compose:**
+
+  ```bash
+  docker build -t kubedeck:local .
+  docker run -d --name kubedeck -p 127.0.0.1:7420:7420 -p 127.0.0.1:7500-7519:7500-7519 \
+    -v ~/.kube:/kube:ro -v kubedeck-data:/data kubedeck:local
+  ```
+
+Always publish the ports on `127.0.0.1` as above: inside the container KubeDeck listens on all interfaces.
 
 ## Features
 
@@ -169,6 +251,27 @@ KubeDeck ran, ready to copy into a terminal.
 Forward pods, services, deployments and statefulsets with the exposed ports pre-filled. Active forwards live in a
 panel where you can open, copy or stop them; they stop when KubeDeck closes.
 
+### Terminal
+
+The **>_ Terminal** button in the sidebar (or <kbd>Ctrl</kbd>+<kbd>`</kbd>) opens your own shell (PowerShell on Windows, your `$SHELL`
+elsewhere) in a panel at the bottom, like the command log. `kubectl` and `helm` run against the context and
+namespace of the focused tab, shown in the panel header (in red when the context is protected), so there is no
+`--context` or `-n` to type; pass your own to override them. Hiding the panel keeps the shells running; `+` opens
+another one.
+
+- **Shell in a pod:** the **Shell** button on a pod (or right-click → Shell) opens `kubectl exec -it` in the
+  terminal panel, in the pod's default container, with a picker when there are more.
+- **Protected contexts:** a `kubectl`/`helm` command that can change the cluster, and any pod shell, asks you to
+  type the context name first. This covers commands that go through `kubectl` and `helm` by name. A full path
+  to the binary, a script that calls the API directly, or a shell profile that puts another `kubectl` earlier in
+  `PATH` is not checked.
+- **Command log:** every `kubectl`/`helm` command from the terminal shows up in the *Commands* panel.
+- **Copy and paste:** select to copy with Ctrl+C (Ctrl+Shift+C always copies), paste with Ctrl+V; Cmd on macOS.
+- **Simple mode:** the real terminal uses [node-pty](https://github.com/microsoft/node-pty), an optional native
+  dependency (prebuilt for Windows and macOS, compiled on Linux). Without it the terminal still works, without
+  resize, Ctrl+C or full-screen programs like `vi` and `top`.
+- The terminal is off in demo mode. `KUBEDECK_SHELL` picks another shell.
+
 ### And also
 
 - **Dashboard:** node and pod health, cluster and per-node CPU/memory against allocatable capacity and requests,
@@ -232,10 +335,12 @@ Click the lock next to the context picker to **protect** it. Recommended for sha
 
 - Nothing is installed in your clusters, and KubeDeck can never do more than your own credentials allow.
 - The server listens on `127.0.0.1` only and every request needs a random token created at startup.
-- Commands run without a shell, and the only write actions are the allow-listed ones above.
+- Outside the terminal, commands run without a shell, and the only write actions are the allow-listed ones above.
 - Secret values are fetched only when you open them and are never stored.
 - No telemetry and no network calls of its own; fonts and assets are bundled, so it works offline.
-- The only file it writes is `~/.kubedeck/settings.json` (UI preferences).
+- The terminal runs your own shell with your own permissions. Its WebSocket needs the same token, and only pages
+  of KubeDeck itself may open it.
+- The only file it writes is `~/.kubedeck/settings.json` (UI preferences; `KUBEDECK_HOME` moves the folder).
 
 Found a vulnerability? Please report it privately — see [SECURITY.md](SECURITY.md).
 
@@ -252,7 +357,8 @@ protected contexts make accidental changes on production hard.
 **Does it work without `metrics-server`?** Yes. The dashboard then shows requests instead of live usage.
 
 **Which actions can it perform?** Restart, scale, delete pod, Flux reconcile / suspend / resume, and adding an
-AKS context. Editing YAML, exec and rollbacks are on the [roadmap](#roadmap).
+AKS context. The built-in terminal runs anything you type, with a confirmation on protected contexts. Editing
+YAML and rollbacks are on the [roadmap](#roadmap).
 
 ## Troubleshooting
 
@@ -305,7 +411,6 @@ Run `az login` in a terminal and click **Retry**. For Entra ID clusters, make su
 
 ## Roadmap
 
-- Shell inside a container (`kubectl exec`)
 - Rollout history and rollback, Helm rollback
 - Edit YAML with a diff before applying
 - Relationship map (Ingress → Service → Workload → Pods), currently behind a feature flag

@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { createApp } from './http.js';
 import { stopAllForwards } from './portforward.js';
+import { stopAllTerminals } from './terminal.js';
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(name);
@@ -14,18 +15,23 @@ const option = (name: string) => {
 if (flag('--help') || flag('-h')) {
   console.log(`kubedeck — local Kubernetes dashboard
 
-Usage: kubedeck [--port 7420] [--no-open] [--demo]
+Usage: kubedeck [--port 7420] [--host 127.0.0.1] [--no-open] [--demo]
 
-  --port <n>   fixed port (default: any free port)
-  --no-open    do not open the browser automatically
-  --demo       explore a built-in fake cluster (no kubectl or cluster needed)
+  --port <n>     fixed port (default: any free port; env KUBEDECK_PORT)
+  --host <addr>  address to listen on (default: 127.0.0.1; env KUBEDECK_HOST).
+                 Use 0.0.0.0 only inside a container whose port is published on the host's 127.0.0.1.
+  --no-open      do not open the browser automatically
+  --demo         explore a built-in fake cluster (no kubectl or cluster needed)
 `);
   process.exit(0);
 }
 
 const dev = flag('--dev');
 if (flag('--demo')) process.env.KUBEDECK_DEMO = '1';
-const port = Number(option('--port') ?? (dev ? 7420 : 0));
+const port = Number(option('--port') ?? process.env.KUBEDECK_PORT ?? (dev ? 7420 : 0));
+const host = option('--host') ?? process.env.KUBEDECK_HOST ?? '127.0.0.1';
+// A wildcard address is not a URL the browser can open; inside a container the port is published on 127.0.0.1.
+const urlHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
 const token = dev ? 'dev' : randomBytes(24).toString('hex');
 
 const server = createApp(token);
@@ -36,9 +42,9 @@ server.on('error', (err: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
-server.listen(port, '127.0.0.1', () => {
+server.listen(port, host, () => {
   const actual = (server.address() as AddressInfo).port;
-  const url = dev ? `http://localhost:5173/?t=${token}` : `http://127.0.0.1:${actual}/?t=${token}`;
+  const url = dev ? `http://localhost:5173/?t=${token}` : `http://${urlHost.includes(':') ? `[${urlHost}]` : urlHost}:${actual}/?t=${token}`;
   console.log(`\n  KubeDeck running at ${url}\n  Press Ctrl+C to stop.\n`);
   if (!dev && !flag('--no-open')) openBrowser(url);
 });
@@ -62,10 +68,14 @@ function openBrowser(url: string) {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     stopAllForwards();
+    stopAllTerminals();
     server.close();
     process.exit(0);
   });
 }
 
 // Child kubectl processes must not outlive the server.
-process.on('exit', stopAllForwards);
+process.on('exit', () => {
+  stopAllForwards();
+  stopAllTerminals();
+});

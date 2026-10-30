@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, isDesktop, sessionToken, type ContextInfo, type PortForward, type Settings } from './api';
 import { BUILTIN_TYPES, DASHBOARD_TYPE, HELM_TYPE, KIND_BY_TYPE, KINDS, genericKind, kindLabel } from './catalog';
 import { AddClusterDialog } from './components/AddClusterDialog';
@@ -14,6 +14,7 @@ import { Empty, ErrorBanner, Icon, Spinner } from './components/ui';
 import { isTyping, useAsync, useKey } from './hooks';
 import { detectLanguage, LANGUAGES, setLanguage, t, type Language } from './i18n';
 import { GO_KEYS } from './route';
+import { newPodShell, newShell, type TermSession } from './terminals';
 import {
   activate, activeTab, addTab, closeTab, cycleTab, goBack, goForward, hashForTab, MAX_PANES, moveTab,
   navigate, newTab, restore, routeFromHash, selectIndex, serialize, singlePane, splitRight,
@@ -58,7 +59,10 @@ export function App() {
   return <Shell initialSettings={boot.data.settings} contexts={boot.data.contexts.contexts} current={boot.data.contexts.current} />;
 }
 
-type BottomPanel = 'commands' | 'forwards' | null;
+type BottomPanel = 'commands' | 'forwards' | 'terminal' | null;
+
+// xterm is large: the terminal panel loads the first time it opens.
+const TerminalPanel = lazy(() => import('./components/TerminalPanel').then((m) => ({ default: m.TerminalPanel })));
 
 interface RecentItem {
   ctx: string;
@@ -105,6 +109,8 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
   const [panel, setPanel] = useState<BottomPanel>(null);
+  const [terms, setTerms] = useState<TermSession[]>([]);
+  const [termActive, setTermActive] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentItem[]>([]);
   const goPending = useRef(0);
@@ -179,6 +185,29 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
     setRecent((r) => [{ ctx: visitCtx, target }, ...r.filter((x) => !(x.ctx === visitCtx && x.target.kind.type === target.kind.type && x.target.name === target.name && x.target.ns === target.ns))].slice(0, MAX_RECENT));
   };
 
+  // ---- terminal panel
+  /** Shows the panel, with a first shell when there is none. */
+  const openTerminal = () => {
+    const s = newShell();
+    setTerms((list) => (list.length ? list : [s]));
+    setTermActive((a) => a || s.id);
+    setPanel('terminal');
+  };
+  const toggleTerminal = () => (panel === 'terminal' ? setPanel(null) : openTerminal());
+
+  const addTerminal = (s: TermSession) => {
+    setTerms((list) => [...list, s]);
+    setTermActive(s.id);
+    setPanel('terminal');
+  };
+
+  const closeTerminal = (id: string) => {
+    const rest = terms.filter((s) => s.id !== id);
+    setTerms(rest);
+    if (termActive === id) setTermActive(rest[rest.length - 1]?.id ?? '');
+    if (!rest.length) setPanel(null);
+  };
+
   const goToType = (type: string) => nav(focusedTab.id, { type, target: undefined }, { detail: false });
 
   const switchContext = (name: string, list = contexts) => {
@@ -223,6 +252,8 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
     }
     if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); setLayout((l) => goBack(l, activeTab(l).id)); return; }
     if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); setLayout((l) => goForward(l, activeTab(l).id)); return; }
+    // Ctrl+` toggles the terminal, also while typing in it.
+    if (e.ctrlKey && e.key === '`') { e.preventDefault(); toggleTerminal(); return; }
     if (isTyping(e) || mod || e.altKey) return;
 
     if (Date.now() - goPending.current < 1200) {
@@ -284,6 +315,7 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
       { ...tool('add-aks', t('palette.addAks'), ['add', 'aks', 'azure', 'cluster'], () => setAdding(true)), group: t('palette.context') },
       tool('forwards', t('pf.panelTitle'), ['pf', 'port', 'forward'], () => setPanel('forwards')),
       tool('commands', t('cmdlog.title'), ['log', 'commands'], () => setPanel('commands')),
+      tool('terminal', t('term.title'), ['terminal', 'shell', 'console'], openTerminal),
       tool('help', t('keys.title'), ['help', 'keys', 'shortcuts'], () => setHelp(true)),
     ];
     return [...recentItems, ...kinds, ...ctxItems, ...tools, ...nsItems];
@@ -315,6 +347,13 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
         <button className={`side-btn${panel === 'commands' ? ' active' : ''}`} onClick={() => setPanel(panel === 'commands' ? null : 'commands')} title={t('topbar.commands')}>
           <Icon name="terminal" size={15} />
           <span className="label">{t('btn.commands')}</span>
+        </button>
+        {/* Looks like a terminal on purpose: it opens a shell, not a list of what KubeDeck ran. */}
+        <button className={`side-btn wide term-btn${panel === 'terminal' ? ' active' : ''}`} onClick={toggleTerminal} title={t('term.open')}>
+          <span className="term-glyph">&gt;_</span>
+          <span className="label">{t('term.title')}</span>
+          {terms.length > 0 && <span className="term-count">{terms.length}</span>}
+          <kbd>Ctrl+`</kbd>
         </button>
         <button className="side-btn" onClick={() => setPalette(true)} title={t('topbar.goTo')}>
           <kbd>:</kbd>
@@ -394,6 +433,7 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
                     onAddCluster={() => setAdding(true)}
                     onToast={showToast}
                     onVisit={visit}
+                    onOpenShell={(podCtx, pod) => addTerminal(newPodShell(podCtx, pod))}
                     onForwardStarted={(fwd: PortForward) => {
                       forwards.reload();
                       setPanel('forwards');
@@ -409,6 +449,22 @@ function Shell({ initialSettings, contexts: initialContexts, current }: { initia
 
       {panel === 'commands' && <CommandLog onClose={() => setPanel(null)} />}
       {panel === 'forwards' && <ForwardsPanel forwards={forwards.data ?? []} onChanged={forwards.reload} onClose={() => setPanel(null)} />}
+      {terms.length > 0 && (
+        <Suspense fallback={null}>
+          <TerminalPanel
+            open={panel === 'terminal'}
+            sessions={terms}
+            active={termActive}
+            ctx={ctx}
+            ns={focusedTab.route.ns}
+            protectedContexts={settings.protectedContexts}
+            onActivate={setTermActive}
+            onNew={() => addTerminal(newShell())}
+            onCloseSession={closeTerminal}
+            onClose={() => setPanel(null)}
+          />
+        </Suspense>
+      )}
 
       {adding && <AddClusterDialog existingContexts={names} onClose={() => setAdding(false)} onDone={clusterAdded} />}
       {palette && <CommandPalette items={paletteItems} onClose={() => setPalette(false)} />}

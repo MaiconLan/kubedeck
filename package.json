@@ -1,6 +1,6 @@
 {
   "name": "kubedeck",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "A fast, good-looking Kubernetes desktop app: tabs, split panes, live logs, diagnosis of failing pods, Flux and Helm, port-forward. Runs your own kubectl; nothing leaves your machine.",
   "type": "module",
   "license": "MIT",
@@ -31,7 +31,6 @@
     "dev:demo": "tsx watch server/cli.ts --dev --demo",
     "media": "npm run build && node scripts/record-media.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
     "@fontsource/geist": "^5.1.0",
     "@fontsource/geist-mono": "^5.1.0",
@@ -39,6 +38,8 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
     "gifenc": "^1.0.3",
@@ -63,6 +64,9 @@
       "dist/**/*",
       "package.json",
       "build/icon.png"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**"
     ],
     "win": {
       "target": [
@@ -116,5 +120,8 @@
     "aks",
     "devops",
     "gitops"
-  ]
+  ],
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
+  }
 }
