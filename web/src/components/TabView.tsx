@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ContextInfo, type PortForward, type Settings } from '../api';
 import {
-  BUILTIN_TYPES, DASHBOARD_TYPE, FEATURES, HELM_TYPE, KIND_BY_TYPE, MAP_TYPE, TRACKED_TYPE, genericKind, isScreen, kindByName, kindLabel,
+  BUILTIN_TYPES, DASHBOARD_TYPE, FEATURES, HELM_TYPE, KIND_BY_TYPE, MAP_TYPE, TERMINAL_TYPE, TRACKED_TYPE, genericKind, isScreen, kindByName, kindLabel,
   type ActionName, type Kind,
 } from '../catalog';
 import { isTyping, useAsync, useKey } from '../hooks';
@@ -18,6 +18,9 @@ import { Tracked } from './Tracked';
 import { Empty, ErrorBanner, Icon, Spinner } from './ui';
 
 export const ALL = '*';
+
+// xterm is large: load it with the first terminal, not with the app.
+const Terminal = lazy(() => import('./Terminal').then((m) => ({ default: m.Terminal })));
 
 /** Catalog entry for a type; unknown types (CRDs) use discovery, or a placeholder until it loads. */
 export function kindForType(type: string, discovery?: Array<{ type: string; kind: string; name: string; shortNames: string[]; namespaced: boolean }>): Kind {
@@ -83,6 +86,9 @@ export function TabView(props: Props) {
   const screen = isScreen(kind);
   const showList = !screen && !tab.detail;
   const onTracked = kind.type === TRACKED_TYPE && !tab.detail;
+  const onTerminal = kind.type === TERMINAL_TYPE;
+  // On the terminal screen the route's target is the pod to open a shell in, not a drawer.
+  const shellPod = onTerminal && target?.kind.type === 'pods' && target.ns ? { name: target.name, ns: target.ns } : undefined;
 
   const list = useAsync(
     async () => {
@@ -175,7 +181,7 @@ export function TabView(props: Props) {
     if (e.key === '/' && !isTyping(e) && !screen) {
       e.preventDefault();
       filterRef.current?.focus();
-    } else if (e.key === 'Escape' && !isTyping(e) && target && !tab.detail) {
+    } else if (e.key === 'Escape' && !isTyping(e) && target && !tab.detail && !onTerminal) {
       closeTarget();
     } else if (e.key === 'Escape' && !isTyping(e) && onTracked && trackedSel) {
       setTrackedSel(null);
@@ -188,6 +194,12 @@ export function TabView(props: Props) {
     : undefined;
 
   const toggleTrack = (pod: any) => save({ tracked: toggleTracked(settings.tracked, ctx, pod) });
+
+  /** Opens a shell inside the pod, in a new tab. */
+  const openShell = (podCtx: string, name: string, podNs?: string) => {
+    if (!podNs) return;
+    props.onOpenTab({ ctx: podCtx, ns: podNs, type: TERMINAL_TYPE, target: { type: 'pods', name, ns: podNs } }, false);
+  };
   const trackedPod = target?.kind.type === 'pods'
     ? items.find((p) => p.metadata?.name === target.name && (p.metadata?.namespace ?? undefined) === target.ns)
     : undefined;
@@ -199,6 +211,7 @@ export function TabView(props: Props) {
     onNavigate: navigateTo,
     onAction: (action: ActionName, tg: Target, obj: any) => setDialog({ action, target: tg, obj, ctx }),
     onForward: (tg: Target, obj: any) => setForwardFor({ target: tg, obj, ctx }),
+    onShell: (tg: Target) => openShell(ctx, tg.name, tg.ns),
     onOpenNewWindow: () => props.onOpenWindow(routeFor(target.kind, target.name, target.ns), true),
     ...(trackedPod && {
       tracked: isTracked(settings.tracked, ctx, trackedPod),
@@ -230,6 +243,7 @@ export function TabView(props: Props) {
         }}
         onAction={(action, t2, obj) => setDialog({ action, target: t2, obj, ctx: sel.ctx })}
         onForward={(t2, obj) => setForwardFor({ target: t2, obj, ctx: sel.ctx })}
+        onShell={(t2) => openShell(sel.ctx, t2.name, t2.ns)}
         onOpenNewTab={() => props.onOpenTab(podRoute, true)}
         onOpenNewWindow={() => props.onOpenWindow(podRoute, true)}
         tracked={isTracked(settings.tracked, sel.ctx, sel.pod)}
@@ -246,8 +260,8 @@ export function TabView(props: Props) {
           <button className="btn btn-ghost btn-sm" onClick={props.onForward} disabled={!tab.forward.length} title={t('topbar.forward')}><Icon name="forward" /></button>
         </div>
 
-        {/* The Tracked screen spans every context and namespace. */}
-        {!onTracked && <>
+        {/* The Tracked screen spans every context and namespace; a pod shell is bound to its pod. */}
+        {!onTracked && !shellPod && <>
         <div className="picker" title={t('topbar.context')}>
           <label>ctx</label>
           <span className="picker-dot" />
@@ -300,7 +314,11 @@ export function TabView(props: Props) {
       </header>
 
       <section className="content">
-        {tab.detail && target ? (
+        {onTerminal ? (
+          <Suspense fallback={<Spinner />}>
+            <Terminal key={shellPod ? `${ctx}/${shellPod.ns}/${shellPod.name}` : 'shell'} ctx={ctx} ns={ns} visible={visible} focused={focused} pod={shellPod} />
+          </Suspense>
+        ) : tab.detail && target ? (
           <div className="page-wrap">
             <div className="content-head">
               <div className="head-title">
@@ -375,6 +393,7 @@ export function TabView(props: Props) {
                     onOpen={openItem}
                     onAction={(action, item) => setDialog({ action, obj: item, ctx, target: rowTarget(item) })}
                     onForward={(item) => setForwardFor({ obj: item, ctx, target: rowTarget(item) })}
+                    onShell={kind.type === 'pods' ? (item) => openShell(ctx, item.metadata.name, item.metadata.namespace) : undefined}
                     leading={kind.type === 'pods' ? (pod) => {
                       const on = isTracked(settings.tracked, ctx, pod);
                       return (
@@ -392,7 +411,7 @@ export function TabView(props: Props) {
         )}
       </section>
 
-      {target && !tab.detail && (
+      {target && !tab.detail && !onTerminal && (
         <DetailDrawer
           key={`${ctx}/${target.kind.type}/${target.ns}/${target.name}`}
           {...drawerProps!}

@@ -363,6 +363,7 @@ export const en = {
   'kind.dashboard': 'Dashboard',
   'kind.map': 'Relationship map',
   'kind.tracked': 'Tracked',
+  'kind.terminal': 'Terminal',
   'tracked.cards': 'Cards',
   'tracked.list': 'List',
   'tracked.summary': 'Tracked pods from all contexts',
@@ -453,6 +454,25 @@ export const en = {
   'error.forwardNotAllowed': 'Port-forward is not available for {type}.',
   'error.portInUse': 'Local port {port} is already in use.',
   'error.noFreePort': 'No free local port between {from} and {to}. Stop a port-forward and try again.',
+  'error.terminalDemo': 'The terminal is off in demo mode: it would run commands on this machine.',
+  'error.terminalRefused': 'Not confirmed: the command did not run.',
+  'error.tooManyTerminals': 'Too many terminals are open. Close one and try again.',
+
+  // terminal
+  'term.shell': 'Shell',
+  'term.shellButton': 'Shell',
+  'term.podShell': 'Shell',
+  'term.container': 'Container',
+  'term.simple': 'Simple mode',
+  'term.simpleHint': 'node-pty is not installed: no resize, no Ctrl+C and no full-screen programs (vi, top). Lines are edited here and sent on Enter.',
+  'term.scope': 'kubectl and helm use {ctx} · {ns}',
+  'term.restart': 'Restart',
+  'term.exited': 'Process ended (code {code}). Press Enter to start again.',
+  'term.confirmTitle': 'Run on a protected context?',
+  'term.confirmExplain': 'This command was typed in the terminal and can change the cluster.',
+  'term.confirmExec': 'A shell inside the pod can change anything in it.',
+  'term.typeContext': 'Type {ctx} to confirm',
+  'term.run': 'Run',
   'error.forwardEnded': 'The port-forward ended.',
 
   // tabs and windows

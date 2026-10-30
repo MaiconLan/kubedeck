@@ -5,6 +5,10 @@ ARG NODE_VERSION=22
 
 # ---- build: compile the server and the web UI
 FROM node:${NODE_VERSION}-bookworm-slim AS build
+# node-pty (the terminal) has no prebuilt binary for Linux: it compiles on install.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Electron and Playwright are dev tools for the desktop app and the media script; the image needs neither.
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
@@ -44,6 +48,8 @@ WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/bin ./bin
 COPY --from=build /app/dist ./dist
+# The only runtime dependency: optional, the terminal falls back to simple mode without it.
+COPY --from=build /app/node_modules/node-pty ./node_modules/node-pty
 
 # Listens on all interfaces inside the container; publish it on the host's 127.0.0.1 only.
 # Port-forwards also listen on all interfaces and use 7500-7519, which the compose file publishes.

@@ -18,6 +18,8 @@ import {
   listContexts, listNamespaces, listObjects,
 } from './resources.js';
 import { loadSettings, saveSettings } from './settings.js';
+import { handleShim, handleTerminal } from './terminal.js';
+import { acceptWebSocket } from './ws.js';
 
 const WEB_ROOT = fileURLToPath(new URL('../web/', import.meta.url));
 const ALLOWED_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
@@ -97,7 +99,7 @@ export function createApp(token: string) {
     return given.length === tokenBuf.length && timingSafeEqual(given, tokenBuf);
   }
 
-  return createServer(async (req, res) => {
+  const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
 
     // Blocks DNS-rebinding: only loopback host names may reach the server.
@@ -111,6 +113,16 @@ export function createApp(token: string) {
         await serveStatic(url.pathname, res);
       } catch {
         if (!res.headersSent) res.writeHead(400).end();
+      }
+      return;
+    }
+
+    // The kubectl/helm scripts of a terminal carry that session's own key instead of the UI token.
+    if (req.method === 'POST' && (url.pathname === '/api/terminal/shim' || url.pathname === '/api/terminal/shim/done')) {
+      try {
+        await handleShim(req, res, url.pathname, await readJson(req));
+      } catch (err) {
+        if (!res.headersSent) sendJson(res, 400, { allow: false, message: String((err as Error)?.message ?? err) });
       }
       return;
     }
@@ -149,6 +161,23 @@ export function createApp(token: string) {
       else res.end();
     }
   });
+
+  // Terminal WebSocket: same host and token rules as the API, plus a same-origin check
+  // (browsers do not apply CORS to WebSockets).
+  server.on('upgrade', (req, socket) => {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const host = req.headers.host ?? '';
+    const origin = req.headers.origin;
+    const sameOrigin = !origin || origin === `http://${host}` || origin === `https://${host}`;
+    if (url.pathname !== '/api/terminal' || !ALLOWED_HOST.test(host) || !sameOrigin || !authorized(req, url)) {
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    const conn = acceptWebSocket(req, socket);
+    if (conn) handleTerminal(conn, req.socket.localPort ?? 0);
+  });
+
+  return server;
 }
 
 function ctxOf(q: Query): Promise<string> {

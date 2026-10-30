@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { createApp } from '../server/http.js';
 import { stopAllForwards } from '../server/portforward.js';
+import { stopAllTerminals } from '../server/terminal.js';
 
 // `electron . --dev` attaches to `npm run dev:server` + `npm run dev:web` (hot reload).
 const DEV_URL = 'http://localhost:5173/?t=dev';
@@ -111,5 +112,8 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('window-all-closed', () => app.quit());
-  app.on('before-quit', stopAllForwards);
+  app.on('before-quit', () => {
+    stopAllForwards();
+    stopAllTerminals();
+  });
 }

@@ -363,6 +363,7 @@ export const ptBR: Messages = {
   'section.overview': 'Visão geral',
   'kind.dashboard': 'Dashboard',
   'kind.tracked': 'Acompanhados',
+  'kind.terminal': 'Terminal',
   'tracked.cards': 'Cartões',
   'tracked.list': 'Lista',
   'tracked.summary': 'Pods acompanhados de todos os contextos',
@@ -454,6 +455,25 @@ export const ptBR: Messages = {
   'error.forwardNotAllowed': 'Port-forward não está disponível para {type}.',
   'error.portInUse': 'A porta local {port} já está em uso.',
   'error.noFreePort': 'Não há porta local livre entre {from} e {to}. Pare um port-forward e tente de novo.',
+  'error.terminalDemo': 'O terminal fica desligado no modo demo: ele rodaria comandos nesta máquina.',
+  'error.terminalRefused': 'Não confirmado: o comando não rodou.',
+  'error.tooManyTerminals': 'Há terminais demais abertos. Feche um e tente de novo.',
+
+  // terminal
+  'term.shell': 'Shell',
+  'term.shellButton': 'Shell',
+  'term.podShell': 'Shell',
+  'term.container': 'Container',
+  'term.simple': 'Modo simples',
+  'term.simpleHint': 'O node-pty não está instalado: sem redimensionar, sem Ctrl+C e sem programas de tela cheia (vi, top). A linha é editada aqui e enviada no Enter.',
+  'term.scope': 'kubectl e helm usam {ctx} · {ns}',
+  'term.restart': 'Reiniciar',
+  'term.exited': 'Processo encerrado (código {code}). Aperte Enter para abrir de novo.',
+  'term.confirmTitle': 'Rodar em contexto protegido?',
+  'term.confirmExplain': 'Este comando foi digitado no terminal e pode mudar o cluster.',
+  'term.confirmExec': 'Um shell dentro do pod pode mudar qualquer coisa nele.',
+  'term.typeContext': 'Digite {ctx} para confirmar',
+  'term.run': 'Rodar',
   'error.forwardEnded': 'O port-forward foi encerrado.',
 
   // tabs and windows
