@@ -1,6 +1,6 @@
 {
   "name": "kubedeck",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "A fast, good-looking Kubernetes desktop app: tabs, split panes, live logs, diagnosis of failing pods, Flux and Helm, port-forward. Runs your own kubectl; nothing leaves your machine.",
   "type": "module",
   "license": "MIT",
