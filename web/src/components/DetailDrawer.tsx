@@ -27,6 +27,8 @@ interface Props {
   onNavigate: (kindName: string, name: string, ns?: string) => void;
   onAction: (action: ActionName, target: Target, obj: any) => void;
   onForward: (target: Target, obj: any) => void;
+  /** Pods: opens a shell inside the pod. */
+  onShell?: (target: Target) => void;
   /** "page": fills a resource tab instead of sliding over a list. */
   variant?: 'drawer' | 'page';
   onOpenNewTab?: () => void;
@@ -90,7 +92,7 @@ export function DetailDrawer(props: Props) {
 
 type Tab = 'overview' | 'logs' | 'secret' | 'describe' | 'yaml' | 'events';
 
-function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction, onForward }: Props) {
+function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction, onForward, onShell }: Props) {
   const { kind, name, ns } = target;
   const obj = useAsync(() => api.object(ctx, kind.type, name, ns), [ctx, kind.type, name, ns], refreshMs);
   const tabs: Array<[Tab, MessageKey]> = [
@@ -128,6 +130,11 @@ function ResourceDetail({ ctx, target, refreshMs, onNavigate, onAction, onForwar
           ))}
         </nav>
         <div className="drawer-actions">
+          {kind.type === 'pods' && onShell && (
+            <button className="btn btn-sm" disabled={!data} onClick={() => onShell(target)}>
+              <Icon name="terminal" /> {t('term.shellButton')}
+            </button>
+          )}
           {kind.forward && (
             <button className="btn btn-sm" disabled={!data} onClick={() => onForward(target, data)}>
               <Icon name="plug" /> {t('pf.button')}

@@ -125,6 +125,7 @@ export const api = {
   azureClusters: (subscription: string) => request<AksCluster[]>('GET', '/api/azure/clusters', { subscription }),
   addAks: (body: AddAksBody) => request<{ context: string; steps: StepResult[] }>('POST', '/api/azure/add', {}, body),
   logsUrl: (params: Record<string, any>) => `/api/logs?${qs({ ...params, t: token })}`,
+  terminalUrl: () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/terminal?${qs({ t: token })}`,
 };
 
 export interface ActionBody {

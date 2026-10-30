@@ -47,6 +47,8 @@ interface Props {
   onToast: (text: string) => void;
   onVisit: (ctx: string, target: Target) => void;
   onForwardStarted: (fwd: PortForward) => void;
+  /** Opens a shell inside a pod in the terminal panel. */
+  onOpenShell: (ctx: string, pod: { name: string; ns: string }) => void;
 }
 
 export function TabView(props: Props) {
@@ -188,6 +190,11 @@ export function TabView(props: Props) {
     : undefined;
 
   const toggleTrack = (pod: any) => save({ tracked: toggleTracked(settings.tracked, ctx, pod) });
+
+  /** Opens a shell inside the pod, in the terminal panel. */
+  const openShell = (podCtx: string, name: string, podNs?: string) => {
+    if (podNs) props.onOpenShell(podCtx, { name, ns: podNs });
+  };
   const trackedPod = target?.kind.type === 'pods'
     ? items.find((p) => p.metadata?.name === target.name && (p.metadata?.namespace ?? undefined) === target.ns)
     : undefined;
@@ -199,6 +206,7 @@ export function TabView(props: Props) {
     onNavigate: navigateTo,
     onAction: (action: ActionName, tg: Target, obj: any) => setDialog({ action, target: tg, obj, ctx }),
     onForward: (tg: Target, obj: any) => setForwardFor({ target: tg, obj, ctx }),
+    onShell: (tg: Target) => openShell(ctx, tg.name, tg.ns),
     onOpenNewWindow: () => props.onOpenWindow(routeFor(target.kind, target.name, target.ns), true),
     ...(trackedPod && {
       tracked: isTracked(settings.tracked, ctx, trackedPod),
@@ -230,6 +238,7 @@ export function TabView(props: Props) {
         }}
         onAction={(action, t2, obj) => setDialog({ action, target: t2, obj, ctx: sel.ctx })}
         onForward={(t2, obj) => setForwardFor({ target: t2, obj, ctx: sel.ctx })}
+        onShell={(t2) => openShell(sel.ctx, t2.name, t2.ns)}
         onOpenNewTab={() => props.onOpenTab(podRoute, true)}
         onOpenNewWindow={() => props.onOpenWindow(podRoute, true)}
         tracked={isTracked(settings.tracked, sel.ctx, sel.pod)}
@@ -375,6 +384,7 @@ export function TabView(props: Props) {
                     onOpen={openItem}
                     onAction={(action, item) => setDialog({ action, obj: item, ctx, target: rowTarget(item) })}
                     onForward={(item) => setForwardFor({ obj: item, ctx, target: rowTarget(item) })}
+                    onShell={kind.type === 'pods' ? (item) => openShell(ctx, item.metadata.name, item.metadata.namespace) : undefined}
                     leading={kind.type === 'pods' ? (pod) => {
                       const on = isTracked(settings.tracked, ctx, pod);
                       return (

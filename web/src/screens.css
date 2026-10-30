@@ -238,3 +238,66 @@
 .usage-cell { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 96px; }
 .usage-cell .meter-track { flex: none; height: 5px; }
 .usage-cell .meter-req { top: -2px; bottom: -2px; }
+
+/* ---- terminal */
+.term-screen { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg-sunken); }
+.term-bar {
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  border-bottom: 1px solid var(--border-soft); background: var(--panel); color: var(--text-2);
+}
+.term-command { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+.term-error { padding: 10px 12px 0; }
+.term-host { flex: 1; min-height: 0; padding: 6px 0 0 10px; }
+.term-host .xterm { height: 100%; }
+.term-host .xterm-viewport { background: transparent !important; }
+
+/* terminal panel: docked at the bottom like the command log, resizable from its top edge */
+.termpanel {
+  position: fixed; left: 236px; right: 0; bottom: 0; z-index: 15;
+  background: var(--bg-sunken); border-top: 1px solid var(--border); box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.termpanel-grip { position: absolute; top: -3px; left: 0; right: 0; height: 6px; cursor: ns-resize; }
+body.resizing-v { cursor: ns-resize; user-select: none; }
+.termpanel-head {
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  border-bottom: 1px solid var(--border-soft); background: var(--bg-elev); min-width: 0;
+}
+.termpanel-head h3 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.termpanel-tabs { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; }
+.termpanel-tab {
+  display: flex; align-items: center; border: 1px solid var(--border-soft); border-radius: 6px;
+  background: var(--panel); color: var(--text-2); font-size: 12px; max-width: 220px;
+}
+.termpanel-tab.active { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+.termpanel-tab > button { background: none; border: 0; color: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 3px 6px; min-width: 0; }
+.termpanel-tab > button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.termpanel-x { padding: 3px 5px 3px 2px !important; opacity: .6; }
+.termpanel-x:hover { opacity: 1; }
+.term-scope {
+  display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2); background: var(--panel-2); border: 1px solid var(--border-soft);
+  overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.term-scope strong { color: var(--text); }
+.term-scope.protected { color: var(--err); background: var(--err-soft); border-color: var(--err); }
+.term-scope.protected strong { color: var(--err); }
+.termpanel-body { flex: 1; min-height: 0; display: flex; }
+.termpanel-session { flex: 1; min-width: 0; display: flex; }
+.termpanel-session .term-screen { flex: 1; }
+.termpanel .term-bar { padding: 4px 12px; background: var(--bg-sunken); }
+
+/* sidebar button: styled as a terminal so it does not read as another list like Commands */
+.term-glyph { font-family: var(--font-mono); font-weight: 700; font-size: 12px; color: var(--ok); letter-spacing: -1px; }
+.side-btn.term-btn {
+  font-family: var(--font-mono); background: var(--bg-sunken); border: 1px solid var(--border); color: var(--text);
+}
+.side-btn.term-btn:hover { border-color: var(--ok); background: var(--bg-sunken); }
+.side-btn.term-btn.active { border-color: var(--ok); background: var(--ok-soft); color: var(--text); }
+.term-count {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--ok-soft); color: var(--ok);
+  font-size: 10.5px; font-weight: 600; display: grid; place-items: center;
+}
+@media (max-width: 900px) { .termpanel { left: 0; } }
+.side-btn.term-btn kbd { width: auto; padding: 0 4px; }

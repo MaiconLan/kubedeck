@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { createApp } from './http.js';
 import { stopAllForwards } from './portforward.js';
+import { stopAllTerminals } from './terminal.js';
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(name);
@@ -67,10 +68,14 @@ function openBrowser(url: string) {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     stopAllForwards();
+    stopAllTerminals();
     server.close();
     process.exit(0);
   });
 }
 
 // Child kubectl processes must not outlive the server.
-process.on('exit', stopAllForwards);
+process.on('exit', () => {
+  stopAllForwards();
+  stopAllTerminals();
+});
