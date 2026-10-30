@@ -41,7 +41,8 @@ const DEFAULTS: Settings = {
   tracked: [],
 };
 
-const DIR = join(homedir(), '.kubedeck');
+// KUBEDECK_HOME moves the settings folder (e.g. to a volume when running in a container).
+const DIR = process.env.KUBEDECK_HOME || join(homedir(), '.kubedeck');
 const FILE = join(DIR, 'settings.json');
 
 let cache: Settings | null = null;

@@ -453,6 +453,7 @@ export const ptBR: Messages = {
   'error.invalidPort': 'Porta inválida.',
   'error.forwardNotAllowed': 'Port-forward não está disponível para {type}.',
   'error.portInUse': 'A porta local {port} já está em uso.',
+  'error.noFreePort': 'Não há porta local livre entre {from} e {to}. Pare um port-forward e tente de novo.',
   'error.forwardEnded': 'O port-forward foi encerrado.',
 
   // tabs and windows

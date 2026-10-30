@@ -452,6 +452,7 @@ export const en = {
   'error.invalidPort': 'Invalid port.',
   'error.forwardNotAllowed': 'Port-forward is not available for {type}.',
   'error.portInUse': 'Local port {port} is already in use.',
+  'error.noFreePort': 'No free local port between {from} and {to}. Stop a port-forward and try again.',
   'error.forwardEnded': 'The port-forward ended.',
 
   // tabs and windows
